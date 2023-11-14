@@ -23,6 +23,7 @@ const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("uart", do_UART),
     ("test", do_test),
     ("move", do_m0ve),
+    ("tud", test_usb_driver),
 ];
 
 fn do_uname(_args: &str) {
@@ -437,4 +438,8 @@ fn do_m0ve(args: &str) {
             _ => println!("move: argument err"),
         }
     }
+}
+
+fn test_usb_driver(str: &str) {
+    driver_usb::init()
 }

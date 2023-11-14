@@ -11,3 +11,7 @@ documentation = "https://rcore-os.github.io/arceos/driver_pci/index.html"
 
 [dependencies]
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers.git", rev = "409ee72" }
+log = "0.4"
+fdt = "0.1.5"
+axhal ={ path = "../../modules/axhal"}
+lazy_init = {path = "../lazy_init"}

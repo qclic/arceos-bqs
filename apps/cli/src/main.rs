@@ -10,7 +10,9 @@ mod cmd;
 // #[cfg(feature = "use-ramfs")]
 // mod ramfs;
 
-use std::io::prelude::*;
+use std::{io::prelude::*, thread::sleep};
+
+use brcm_pcie::BCM2711PCIeHostBridge;
 
 const LF: u8 = b'\n';
 const CR: u8 = b'\r';
@@ -19,6 +21,7 @@ const BS: u8 = b'\x08';
 const SPACE: u8 = b' ';
 
 const MAX_CMD_LEN: usize = 256;
+const MMIO_BASE: usize = 0xffff_0000_fd50_0000;
 
 fn print_prompt() {
     // print!(
@@ -29,6 +32,19 @@ fn print_prompt() {
     std::io::stdout().flush().unwrap();
 }
 
+struct BridgeImpl;
+
+impl brcm_pcie::BCM2711Hal for BridgeImpl {
+    fn sleep(ms: core::time::Duration) {
+        sleep(ms.clone())
+    }
+}
+
+fn enable_pcie() {
+    let pcie_host_bridge = BCM2711PCIeHostBridge::<BridgeImpl>::new(MMIO_BASE);
+    pcie_host_bridge.setup();
+}
+
 #[cfg_attr(feature = "axstd", no_mangle)]
 fn main() {
     let mut stdin = std::io::stdin();
@@ -36,6 +52,9 @@ fn main() {
 
     let mut buf = [0; MAX_CMD_LEN];
     let mut cursor = 0;
+
+    enable_pcie();
+
     cmd::run_cmd("help".as_bytes());
     print_prompt();
 
