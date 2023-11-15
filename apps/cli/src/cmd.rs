@@ -440,6 +440,4 @@ fn do_m0ve(args: &str) {
     }
 }
 
-fn test_usb_driver(str: &str) {
-    driver_usb::init()
-}
+fn test_usb_driver(str: &str) {}

@@ -18,6 +18,9 @@ pub enum AxDeviceEnum {
     /// Graphic display device.
     #[cfg(feature = "display")]
     Display(AxDisplayDevice),
+    /// Graphic xhci device.
+    #[cfg(feature = "xhci")]
+    XHCI(AxXHciDevice),
 }
 
 impl BaseDriverOps for AxDeviceEnum {
@@ -31,6 +34,8 @@ impl BaseDriverOps for AxDeviceEnum {
             Self::Block(_) => DeviceType::Block,
             #[cfg(feature = "display")]
             Self::Display(_) => DeviceType::Display,
+            #[cfg(feature = "xhci")]
+            Self::XHCI(_) => DeviceType::Display,
             _ => unreachable!(),
         }
     }
@@ -45,6 +50,8 @@ impl BaseDriverOps for AxDeviceEnum {
             Self::Block(dev) => dev.device_name(),
             #[cfg(feature = "display")]
             Self::Display(dev) => dev.device_name(),
+            #[cfg(feature = "xhci")]
+            Self::XHCI(dev) => dev.device_name(),
             _ => unreachable!(),
         }
     }

@@ -16,6 +16,7 @@ members = [
     "crates/driver_block",
     "crates/driver_common",
     "crates/driver_display",
+    "crates/driver_xhci",
     "crates/driver_net",
     "crates/driver_pci",
     "crates/driver_virtio",
@@ -71,7 +72,7 @@ members = [
     "apps/task/priority",
     "apps/task/tls",
     "apps/cli",
-    "apps/boards/raspi4", "crates/driver_usb",
+    "apps/boards/raspi4",
 ]
 
 

@@ -28,7 +28,7 @@ use virtio_drivers::transport::Transport;
 use virtio_drivers::{BufferDirection, Hal, PhysAddr, PAGE_SIZE};
 
 pub fn op_spec_mmio_device<OpMMIODevice, OpPCIDevice, DeviceFilter>(
-    mmio_base: usize,
+    fdt_file: usize,
     op_mmio_device: OpMMIODevice,
     op_pci_device: OpPCIDevice,
     device_filter: DeviceFilter,
@@ -38,9 +38,10 @@ pub fn op_spec_mmio_device<OpMMIODevice, OpPCIDevice, DeviceFilter>(
     DeviceFilter: Fn(&DeviceFunctionInfo) -> bool,
 {
     info!("driver pci started.");
-    info!("Loading FDT from {:x}", mmio_base);
+    // info!("Loading FDT from {:x}", mmio_base);
     // Safe because the pointer is a valid pointer to unaliased memory.
-    let fdt = unsafe { Fdt::new(mmio_base as *const u8).unwrap() }; // fix this stuff
+    // let fdt = unsafe { Fdt::from_ptr(mmio_base as *const u8).unwrap() }; // fix this stuff
+    let fdt = unsafe { Fdt::from_ptr(fdt_file as *const u8).unwrap() };
 
     for node in fdt.all_nodes() {
         // Dump information about the node for debugging.

@@ -100,3 +100,29 @@ cfg_if! {
         }
     }
 }
+
+cfg_if! {
+    if #[cfg(xhci_dev = "dummy")] {
+        pub struct DummyXHciDev;
+        pub struct DummyXHCIDriver;
+        register_xhci_driver!(DummyXHCIDriver, DummyXHciDev);
+
+        impl BaseDriverOps for DummyXHciDev {
+            fn device_type(&self) -> DeviceType {
+                DeviceType::XHCI
+            }
+            fn device_name(&self) -> &str {
+                "dummy-xhci"
+            }
+        }
+
+        impl XhciDriverOps for DummyXHciDev {
+            fn info(&self) -> driver_xhci::DisplayInfo {
+                self::XhciInfo
+            }
+            fn device_name -> &str{
+                "xhci-controller"
+            }
+        }
+    }
+}

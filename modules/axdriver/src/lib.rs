@@ -90,6 +90,8 @@ pub use self::structs::AxBlockDevice;
 pub use self::structs::AxDisplayDevice;
 #[cfg(feature = "net")]
 pub use self::structs::AxNetDevice;
+#[cfg(feature = "xhci")]
+pub use self::structs::AxXhciDevice;
 
 /// A structure that contains all device drivers, organized by their category.
 #[derive(Default)]
@@ -103,6 +105,8 @@ pub struct AllDevices {
     /// All graphics device drivers.
     #[cfg(feature = "display")]
     pub display: AxDeviceContainer<AxDisplayDevice>,
+    #[cfg(feature = "xhci")]
+    pub xhvi: AxDeviceContainer<AxXhciDevice>,
 }
 
 impl AllDevices {
@@ -143,6 +147,8 @@ impl AllDevices {
             AxDeviceEnum::Block(dev) => self.block.push(dev),
             #[cfg(feature = "display")]
             AxDeviceEnum::Display(dev) => self.display.push(dev),
+            #[cfg(feature = "xhci")]
+            AxDeviceEnum::XHCI(dev) => self.xhci.push(dev),
         }
     }
 }
@@ -177,6 +183,14 @@ pub fn init_drivers() -> AllDevices {
         for (i, dev) in all_devs.display.iter().enumerate() {
             assert_eq!(dev.device_type(), DeviceType::Display);
             debug!("  graphics device {}: {:?}", i, dev.device_name());
+        }
+    }
+    #[cfg(feature = "xhci")]
+    {
+        debug!("number of xhci devices: {}", all_devs.xhci.len());
+        for (i, dev) in all_devs.xhci.iter().enumerate() {
+            assert_eq!(dev.device_type(), DeviceType::XHCI);
+            debug!("  xhci device {}: {:?}", i, dev.device_name());
         }
     }
 

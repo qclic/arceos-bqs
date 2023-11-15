@@ -4,6 +4,8 @@ pub use crate::drivers::AxBlockDevice;
 pub use crate::drivers::AxDisplayDevice;
 #[cfg(feature = "net")]
 pub use crate::drivers::AxNetDevice;
+#[cfg(feature = "xhci")]
+pub use crate::drivers::AxXHciDevice;
 
 impl super::AxDeviceEnum {
     /// Constructs a network device.
@@ -22,6 +24,11 @@ impl super::AxDeviceEnum {
     #[cfg(feature = "display")]
     pub const fn from_display(dev: AxDisplayDevice) -> Self {
         Self::Display(dev)
+    }
+
+    #[cfg(feature = "xhci")]
+    pub const fn from_xhci(dev: AxXHciDevice) -> Self {
+        Self::XHCI(dev)
     }
 }
 

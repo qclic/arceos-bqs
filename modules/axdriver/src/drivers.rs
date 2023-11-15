@@ -67,6 +67,21 @@ cfg_if::cfg_if! {
     }
 }
 
+//xhci__
+cfg_if::cfg_if! {
+    if #[cfg(xhci_dev = "xhci")] {
+        pub struct XhciDriver;
+        register_xhci_driver!(XhciDriver,driver_xhci::XhciController);
+
+        impl DriverProbe for XhciDriver {
+            fn probe_global() -> Option<AxDeviceEnum> {
+                // TODO: probe xhci device
+
+            }
+        }
+    }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(block_dev = "bcm2835-sdhci")]{
         pub struct BcmSdhciDriver;
@@ -94,6 +109,7 @@ cfg_if::cfg_if! {
                     dev_info: &driver_pci::DeviceFunctionInfo,
                 ) -> Option<crate::AxDeviceEnum> {
                     use crate::ixgbe::IxgbeHalImpl;
+                    //add ah118 device detect
                     use driver_net::ixgbe::{INTEL_82599, INTEL_VEND, IxgbeNic};
                     if dev_info.vendor_id == INTEL_VEND && dev_info.device_id == INTEL_82599 {
                         // Intel 10Gb Network

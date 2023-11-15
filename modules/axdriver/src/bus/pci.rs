@@ -99,18 +99,26 @@ impl AllDevices {
                     continue;
                 }
                 match config_pci_device(&mut root, bdf, &mut allocator) {
-                    Ok(_) => for_each_drivers!(type Driver, {
-                        if let Some(dev) = Driver::probe_pci(&mut root, bdf, &dev_info) {
-                            info!(
-                                "registered a new {:?} device at {}: {:?}",
-                                dev.device_type(),
-                                bdf,
-                                dev.device_name(),
-                            );
-                            self.add_device(dev);
-                            continue; // skip to the next device
-                        }
-                    }),
+                    Ok(_) => {
+                        info!(
+                            "fond a new {:?} device at {}: {:?}",
+                            dev.device_type(),
+                            bdf,
+                            dev.device_name(),
+                        );
+                        for_each_drivers!(type Driver, {
+                            if let Some(dev) = Driver::probe_pci(&mut root, bdf, &dev_info) {
+                                info!(
+                                    "registered a new {:?} device at {}: {:?}",
+                                    dev.device_type(),
+                                    bdf,
+                                    dev.device_name(),
+                                );
+                                self.add_device(dev);
+                                continue; // skip to the next device
+                            }
+                        });
+                    }
                     Err(e) => warn!(
                         "failed to enable PCI device at {}({}): {:?}",
                         bdf, dev_info, e
