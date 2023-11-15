@@ -59,6 +59,7 @@ cfg_if::cfg_if! {
         impl DriverProbe for RamDiskDriver {
             fn probe_global() -> Option<AxDeviceEnum> {
                 // TODO: format RAM disk
+
                 Some(AxDeviceEnum::from_block(
                     driver_block::ramdisk::RamDisk::new(0x100_0000), // 16 MiB
                 ))
@@ -76,7 +77,7 @@ cfg_if::cfg_if! {
         impl DriverProbe for XhciDriver {
             fn probe_global() -> Option<AxDeviceEnum> {
                 // TODO: probe xhci device
-
+                unimplemented!()
             }
         }
     }
@@ -109,28 +110,29 @@ cfg_if::cfg_if! {
                     dev_info: &driver_pci::DeviceFunctionInfo,
                 ) -> Option<crate::AxDeviceEnum> {
                     use crate::ixgbe::IxgbeHalImpl;
-                    //add ah118 device detect
                     use driver_net::ixgbe::{INTEL_82599, INTEL_VEND, IxgbeNic};
-                    if dev_info.vendor_id == INTEL_VEND && dev_info.device_id == INTEL_82599 {
-                        // Intel 10Gb Network
-                        info!("ixgbe PCI device found at {:?}", bdf);
+                    //todo add ah118 device detect
+                    match Some(dev_info.vendor_id,dev_info.device_id) {
+                        Some(INTEL_VEND,INTEL_82599)=> {
+                            // Intel 10Gb Network
+                            info!("ixgbe PCI device found at {:?}", bdf);
 
-                        // Initialize the device
-                        // These can be changed according to the requirments specified in the ixgbe init function.
-                        const QN: u16 = 1;
-                        const QS: usize = 1024;
-                        let bar_info = root.bar_info(bdf, 0).unwrap();
-                        match bar_info {
-                            driver_pci::BarInfo::Memory {
-                                address,
-                                size,
-                                ..
-                            } => {
-                                let ixgbe_nic = IxgbeNic::<IxgbeHalImpl, QS, QN>::init(
-                                    phys_to_virt((address as usize).into()).into(),
-                                    size as usize
-                                )
-                                .expect("failed to initialize ixgbe device");
+                            // Initialize the device
+                            // These can be changed according to the requirments specified in the ixgbe init function.
+                            const QN: u16 = 1;
+                            const QS: usize = 1024;
+                            let bar_info = root.bar_info(bdf, 0).unwrap();
+                            match bar_info {
+                                driver_pci::BarInfo::Memory {
+                                    address,
+                                    size,
+                                    ..
+                                } => {
+                                    let ixgbe_nic = IxgbeNic::<IxgbeHalImpl, QS, QN>::init(
+                                        phys_to_virt((address as usize).into()).into(),
+                                        size as usize
+                                    )
+                                    .expect("failed to initialize ixgbe device");
                                 return Some(AxDeviceEnum::from_net(ixgbe_nic));
                             }
                             driver_pci::BarInfo::IO { .. } => {
@@ -139,7 +141,8 @@ cfg_if::cfg_if! {
                             }
                         }
                     }
-                    None
+                    _ => None
+                }
             }
         }
     }

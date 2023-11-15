@@ -91,7 +91,7 @@ pub use self::structs::AxDisplayDevice;
 #[cfg(feature = "net")]
 pub use self::structs::AxNetDevice;
 #[cfg(feature = "xhci")]
-pub use self::structs::AxXhciDevice;
+pub use self::structs::AxXHciDevice;
 
 /// A structure that contains all device drivers, organized by their category.
 #[derive(Default)]
@@ -106,7 +106,7 @@ pub struct AllDevices {
     #[cfg(feature = "display")]
     pub display: AxDeviceContainer<AxDisplayDevice>,
     #[cfg(feature = "xhci")]
-    pub xhvi: AxDeviceContainer<AxXhciDevice>,
+    pub xhci: AxDeviceContainer<AxXHciDevice>,
 }
 
 impl AllDevices {
