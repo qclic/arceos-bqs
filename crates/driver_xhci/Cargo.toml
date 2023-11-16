@@ -1,0 +1,16 @@
+[package]
+name = "driver_xhci"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+driver_common = { path = "../driver_common" }
+xhci = "0.9.2"
+axhal = {path = "../../modules/axhal"}
+axalloc = {path = "../../modules/axalloc"}
+page_table = {path = "../page_table"}
+page_table_entry = {path = "../page_table_entry"}
+log = "0.4.20"
