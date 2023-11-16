@@ -273,6 +273,7 @@ fn do_test(args: &str) {
 
 //brokkkkkken key board
 use arm_pl011::pl011::Pl011Uart;
+use axalloc::GlobalAllocator;
 fn do_m0ve(args: &str) {
     let uart_base = 0xffff_0000_fe20_1a00 as *mut u8;
     let mut uart = Pl011Uart::new(uart_base);
@@ -440,4 +441,9 @@ fn do_m0ve(args: &str) {
     }
 }
 
-fn test_usb_driver(str: &str) {}
+// #[global_allocator]
+// static global_allocator: &GlobalAllocator = axalloc::global_allocator();
+
+fn test_usb_driver(str: &str) {
+    axdriver::init_drivers();
+}

@@ -4,6 +4,7 @@
 
 use crate::AxDeviceEnum;
 use driver_common::DeviceType;
+use driver_xhci::{XhciController, XhciDriver, VL805_DEVICE_ID, VL805_VENDOR_ID};
 
 #[cfg(feature = "virtio")]
 use crate::virtio::{self, VirtIoDevMeta};
@@ -111,9 +112,10 @@ cfg_if::cfg_if! {
                 ) -> Option<crate::AxDeviceEnum> {
                     use crate::ixgbe::IxgbeHalImpl;
                     use driver_net::ixgbe::{INTEL_82599, INTEL_VEND, IxgbeNic};
+                    use driver_xhci::{VL805_VENDOR_ID,VL805_DEVICE_ID};
                     //todo add ah118 device detect
-                    match Some(dev_info.vendor_id,dev_info.device_id) {
-                        Some(INTEL_VEND,INTEL_82599)=> {
+                    match Some((dev_info.vendor_id,dev_info.device_id)) {
+                        Some((INTEL_VEND,INTEL_82599))=> {
                             // Intel 10Gb Network
                             info!("ixgbe PCI device found at {:?}", bdf);
 
@@ -139,6 +141,17 @@ cfg_if::cfg_if! {
                                 error!("ixgbe: BAR0 is of I/O type");
                                 return None;
                             }
+                        }
+                        },
+                        Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
+                            info!("vl805 found! at {:?}",bdf);
+                            let bar_info = root.bar_info(bdf, 0).unwrap();
+                            match bar_info {
+                                driver_pci::BarInfo::Memory{address,size, ..}=>{
+                                    XhciDriver::init(address);
+                                }
+                                _=>return None
+                            // return Some(AxDeviceEnum::from_xhci(dev))
                         }
                     }
                     _ => None
