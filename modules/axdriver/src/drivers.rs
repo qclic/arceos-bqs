@@ -89,7 +89,7 @@ cfg_if::cfg_if! {
                             let bar_info = root.bar_info(bdf, 0).unwrap();
                             match bar_info {
                                 driver_pci::BarInfo::Memory{address,size, ..}=>{
-                                    return Some(AxDeviceEnum::XHCI(XhciController::init(address)));
+                                    return Some(AxDeviceEnum::XHCI(XhciController::init(address as usize)));
                                 }
                                 _=>return None
                             // return Some(AxDeviceEnum::from_xhci(dev))
@@ -122,6 +122,7 @@ cfg_if::cfg_if! {
         use axhal::mem::phys_to_virt;
         pub struct IxgbeDriver;
         register_net_driver!(IxgbeDriver, driver_net::ixgbe::IxgbeNic<IxgbeHalImpl, 1024, 1>);
+        register_xhci_driver!(XhciDriver,driver_xhci::XhciController);
         impl DriverProbe for IxgbeDriver {
             fn probe_pci(
                     root: &mut driver_pci::PciRoot,
@@ -165,7 +166,13 @@ cfg_if::cfg_if! {
                             let bar_info = root.bar_info(bdf, 0).unwrap();
                             match bar_info {
                                 driver_pci::BarInfo::Memory{address,size, ..}=>{
-                                    return Some(AxDeviceEnum::XHCI(XhciController::init(address)));
+                                    return Some(
+                                        AxDeviceEnum::XHCI(
+                                            XhciController::init(
+                                                phys_to_virt((address as usize).into()).as_usize()
+                                            )
+                                        )
+                                );
                                 }
                                 _=>return None
                             // return Some(AxDeviceEnum::from_xhci(dev))

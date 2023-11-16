@@ -4,7 +4,7 @@
 
 use core::{alloc::Layout, num::NonZeroUsize};
 
-use axhal::mem::{phys_to_virt, PhysAddr};
+use axhal::mem::{phys_to_virt, virt_to_phys, PhysAddr};
 #[doc(no_inline)]
 pub use driver_common::{BaseDriverOps, DevError, DevResult, DeviceType};
 use log::info;
@@ -27,14 +27,20 @@ struct MemoryMapper;
 impl Mapper for MemoryMapper {
     unsafe fn map(&mut self, phys_base: usize, bytes: usize) -> NonZeroUsize {
         // axalloc::global_allocator
-        let from = PhysAddr::from(phys_base);
+        // let from = PhysAddr::from(phys_base).align_down_4k();
+        let virt_to_phys = virt_to_phys(phys_base.into());
         // let from = A64PTE(phys_base);
 
-        let pte: A64PTE = page_table::GenericPTE::new_page(from, MappingFlags::all(), false);
+        info!("mapping");
+        let pte: A64PTE =
+            page_table::GenericPTE::new_page(virt_to_phys, MappingFlags::DEVICE, false);
         // A64PTE::
+        info!("mapped");
+        page_table::PagingIf::phys_to_virt(paddr);
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
-        return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
+        return NonZeroUsize::new_unchecked(phys_base);
+        // return NonZeroUsize::new_unchecked(phys_base);
     }
 
     fn unmap(&mut self, virt_base: usize, bytes: usize) {
@@ -43,12 +49,12 @@ impl Mapper for MemoryMapper {
 }
 
 impl XhciController {
-    pub fn init(add: u64) -> XhciController {
+    pub fn init(add: usize) -> XhciController {
         info!("received address:{:x}", add);
         XhciController {
             controller: unsafe {
                 let mapper = MemoryMapper {};
-                xhci::Registers::new(add.try_into().unwrap(), mapper)
+                xhci::Registers::new(add, mapper)
             },
         }
     }
