@@ -83,6 +83,7 @@ dependencies = [
  "axdriver",
  "axstd",
  "brcm_pcie",
+ "driver_xhci",
 ]
 
 [[package]]

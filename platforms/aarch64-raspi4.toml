@@ -21,7 +21,7 @@ mmio-regions = [
     ["0xFE20_1000", "0x1000"],      # PL011 UART
     ["0xFF84_1000", "0x8000"],      # GICv2
     ["0xFD50_0000", "0x9310"],      # pcie ecam
-    ["0x6_0000_0000", "0x1_FFFF_FFFF"],      # pcie
+    ["0xF8000000", "0x4000000"],      # pcie
 ]
 virtio-mmio-regions = []
 # UART Address
@@ -29,9 +29,9 @@ uart-paddr = "0xFE20_1000"
 uart-irq = "0x79"
 
 # Base physical address of the PCIe ECAM space.
-pci-ecam-base = "0xfd500000"
+pci-ecam-base = "0xfd50_0000"
 # End PCI bus number.
-pci-bus-end = "2"
+pci-bus-end = "8"
 # PCI device memory ranges.
 pci-ranges = [
     # just for known config structure, not real address
@@ -41,7 +41,7 @@ pci-ranges = [
     ["0x00","0x3800000"],
     # ["0x6_0000_0000", "0x7_FFFF_FFFF"],   # 64-bit MMIO space
     ["0x6_0000_0000", "0x7_FFFF_FFFF"],   # 64-bit MMIO space
-    # ["0xFD50_0000", "0x7_FFFF_FFFF"],      # pcie
+    # ["0xFD50_0000", "0xFD50_9310"],      # pcie
     # ["0x04","0x7c000000"],
 ] #TODO: findout ranges
 

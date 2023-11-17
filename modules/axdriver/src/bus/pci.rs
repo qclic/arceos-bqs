@@ -31,8 +31,10 @@ fn config_pci_device(
                             .ok_or(DevError::NoMemory)?;
                         if address_type == MemoryBarType::Width32 {
                             root.set_bar_32(bdf, bar, new_addr as _);
+                            info!("type 32");
                         } else if address_type == MemoryBarType::Width64 {
                             root.set_bar_64(bdf, bar, new_addr);
+                            info!("type 64");
                         }
                     }
                 }
@@ -74,10 +76,13 @@ fn config_pci_device(
 
                 bar += 1;
                 if info.takes_two_entries() {
+                    info!("two ents");
                     bar += 1;
                 }
             }
-            Err(_) => {}
+            Err(_) => {
+                bar += 1;
+            }
         };
     }
 

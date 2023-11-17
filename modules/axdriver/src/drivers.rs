@@ -4,7 +4,10 @@
 
 use crate::AxDeviceEnum;
 use driver_common::DeviceType;
-use driver_xhci::{XhciController, XhciDriverOps, VL805_DEVICE_ID, VL805_VENDOR_ID};
+use driver_pci::Command;
+use driver_xhci::{
+    register_operations_init_xhci, XhciController, XhciDriverOps, VL805_DEVICE_ID, VL805_VENDOR_ID,
+};
 
 #[cfg(feature = "virtio")]
 use crate::virtio::{self, VirtIoDevMeta};
@@ -122,7 +125,7 @@ cfg_if::cfg_if! {
         use axhal::mem::phys_to_virt;
         pub struct IxgbeDriver;
         register_net_driver!(IxgbeDriver, driver_net::ixgbe::IxgbeNic<IxgbeHalImpl, 1024, 1>);
-        register_xhci_driver!(XhciDriver,driver_xhci::XhciController);
+        // register_xhci_driver!(XhciDriver,driver_xhci::XhciController);
         impl DriverProbe for IxgbeDriver {
             fn probe_pci(
                     root: &mut driver_pci::PciRoot,
@@ -164,12 +167,27 @@ cfg_if::cfg_if! {
                         Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
                             info!("vl805 found! at {:?}",bdf);
                             let bar_info = root.bar_info(bdf, 0).unwrap();
+                            const PCI_COMMAND_PARITY:u16 = 0x40;
+                            info!("{}",bar_info);
+                            // unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
                             match bar_info {
-                                driver_pci::BarInfo::Memory{address,size, ..}=>{
+                            driver_pci::BarInfo::Memory{address,size, ..}=>{
+                            register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
+                            loop {
+
+                                let stat = root.get_status_command(bdf).0.bits();
+                                let command = root.get_status_command(bdf).1.bits();
+
+                                info!("status:{:x}",stat);
+                                info!("command:{:x}",command);
+                                if stat != 0x10{
+                                    break;
+                                }
+                            }
                                     return Some(
                                         AxDeviceEnum::XHCI(
                                             XhciController::init(
-                                                phys_to_virt((address as usize).into()).as_usize()
+                                                address as usize
                                             )
                                         )
                                 );
