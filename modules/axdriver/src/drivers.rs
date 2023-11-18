@@ -172,25 +172,26 @@ cfg_if::cfg_if! {
                             // unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
                             match bar_info {
                             driver_pci::BarInfo::Memory{address,size, ..}=>{
-                            register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
-                            loop {
+                            // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
+                            // loop {
 
                                 let stat = root.get_status_command(bdf).0.bits();
                                 let command = root.get_status_command(bdf).1.bits();
 
                                 info!("status:{:x}",stat);
                                 info!("command:{:x}",command);
-                                if stat != 0x10{
-                                    break;
-                                }
-                            }
-                                    return Some(
-                                        AxDeviceEnum::XHCI(
-                                            XhciController::init(
-                                                address as usize
-                                            )
-                                        )
-                                );
+                                // if stat != 0x10{
+                                    // break;
+                                // }
+                            // }
+                                //     return Some(
+                                //         AxDeviceEnum::XHCI(
+                                //             XhciController::init(
+                                //                 mmio as usize
+                                //             )
+                                //         )
+                                // );
+                                return Some(AxDeviceEnum::XHCI(XhciController{}))
                                 }
                                 _=>return None
                             // return Some(AxDeviceEnum::from_xhci(dev))

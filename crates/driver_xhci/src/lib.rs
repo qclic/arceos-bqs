@@ -12,7 +12,7 @@ use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 use xhci::{accessor::Mapper, Registers};
 
 pub struct XhciController {
-    controller: Registers<MemoryMapper>,
+    // pub controller: Registers<MemoryMapper>,
 }
 
 pub const VL805_VENDOR_ID: u16 = 0x1106;
@@ -38,7 +38,8 @@ impl Mapper for MemoryMapper {
         // // A64PTE::
         // info!("mapped");
         // let phys_to_virt = page_table::PagingIf::phys_to_virt(PhysAddr::from(phys_base));
-        let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base + bytes));
+        info!("mapping:{:x}", phys_base);
+        let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base));
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
         // return NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
@@ -66,7 +67,8 @@ impl XhciController {
         // }
         info!("received address:{:x}", add);
         XhciController {
-            controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
+            // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
+            // controller: unsafe { xhci::Registers::new(add, MemoryMapper {}) },
         }
     }
 }

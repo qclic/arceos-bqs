@@ -14,3 +14,4 @@ axalloc = {path = "../../modules/axalloc"}
 page_table = {path = "../page_table"}
 page_table_entry = {path = "../page_table_entry"}
 log = "0.4.20"
+aarch64-cpu = "9.3"

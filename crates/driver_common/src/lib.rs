@@ -27,7 +27,7 @@ pub enum DeviceType {
     Net,
     /// Graphic display device (e.g., GPU)
     Display,
-
+    ///xhci device
     XHCI,
 }
 

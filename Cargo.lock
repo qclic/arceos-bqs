@@ -957,6 +957,7 @@ dependencies = [
 name = "driver_xhci"
 version = "0.1.0"
 dependencies = [
+ "aarch64-cpu",
  "axalloc",
  "axhal",
  "driver_common",

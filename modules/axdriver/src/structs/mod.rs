@@ -35,7 +35,7 @@ impl BaseDriverOps for AxDeviceEnum {
             #[cfg(feature = "display")]
             Self::Display(_) => DeviceType::Display,
             #[cfg(feature = "xhci")]
-            Self::XHCI(_) => DeviceType::Display,
+            Self::XHCI(_) => DeviceType::XHCI,
             _ => unreachable!(),
         }
     }

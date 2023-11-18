@@ -31,7 +31,7 @@ uart-irq = "0x79"
 # Base physical address of the PCIe ECAM space.
 pci-ecam-base = "0xfd50_0000"
 # End PCI bus number.
-pci-bus-end = "8"
+pci-bus-end = "2"
 # PCI device memory ranges.
 pci-ranges = [
     # just for known config structure, not real address

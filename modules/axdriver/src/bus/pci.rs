@@ -181,7 +181,7 @@ impl AllDevices {
                                     dev.device_name(),
                                 );
                                 self.add_device(dev);
-                                continue; // skip to the next device
+                                break 'out; // skip to the next device
                             }
                         }),
                         Err(e) => warn!(
