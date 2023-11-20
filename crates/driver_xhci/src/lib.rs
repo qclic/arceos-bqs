@@ -1,6 +1,7 @@
 //! Common traits and types for xhci device drivers.
 
 #![no_std]
+#![feature(strict_provenance)]
 
 use core::{alloc::Layout, num::NonZeroUsize};
 

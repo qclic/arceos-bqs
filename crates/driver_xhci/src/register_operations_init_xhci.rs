@@ -98,7 +98,7 @@ fn enable_bridge(bus: u8, dfn: u8, address: usize) {
         loop {
             let val1 = *((conf + PCI_CLASS_REVISION) as *const u64); //var type bit length definition err: my own mistake, could ignore for now
             let val2 = *((conf + PCI_HEADER_TYPE) as *const u8);
-            let cond1 = (val1 >> 8 != 0x060400);
+            let cond1 = val1 >> 8 != 0x060400;
             // let cond1 = false;
             let cond2 = val2 as usize != PCI_HEADER_TYPE_BRIDGE;
             if !(cond1 || cond2) {
@@ -216,6 +216,7 @@ fn get_tags(prop_tag: &mut PropertyTag) -> bool {
     info!("get_tags");
     let buffer_size: usize = 72 + 128 + 32;
     let p_buffer = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize() as *mut TPropertyBuffer;
+    info!("p_buffer:{:x}", p_buffer as usize);
 
     unsafe {
         (*p_buffer).n_buffer_size = buffer_size as u32;
@@ -229,16 +230,25 @@ fn get_tags(prop_tag: &mut PropertyTag) -> bool {
         // barr
         barrier::dsb(SY);
 
-        let n_buffer_address = p_buffer as usize & !0xC0000000 | 0xC0000000;
+        let n_buffer_address = p_buffer.addr() & !0xC0000000 | 0xC0000000;
 
         if write_read(n_buffer_address as u32) != n_buffer_address as u32 {
+            info!("cond match:{:x}", n_buffer_address as u32);
             return false;
         }
 
-        barrier::dmb(ST);
+        barrier::dmb(SY);
 
-        if (*p_buffer).n_code != CODE_RESPONSE_SUCCESS as u32 {
-            return false;
+        let mut n_code = (*p_buffer).n_code;
+        // if n_code != CODE_RESPONSE_SUCCESS as u32 {
+        //     info!("cond match:{:x}:{:x}", n_code, CODE_RESPONSE_SUCCESS);
+        //     return false;
+        // }
+        while n_code != CODE_RESPONSE_SUCCESS as u32 {
+            // has issue of this var
+            info!("cond match:{:x}:{:x}", n_code, CODE_RESPONSE_SUCCESS);
+            n_code = (*p_buffer).n_code;
+            // return false;
         }
 
         *prop_tag = (*p_buffer).tags;
@@ -283,9 +293,10 @@ fn write_read(n_data: u32) -> u32 {
             & MAILBOX_STATUS_EMPTY)
             != 0)
         {
-            *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32);
+            let usize = *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32);
 
             // CTimer::SimpleMsDelay(20);
+            info!("waiting...{:x}", usize);
             delay(1)
         }
 
@@ -295,36 +306,43 @@ fn write_read(n_data: u32) -> u32 {
             != 0
         {
             // do nothing
+            info!(
+                "waiting...:{:x}",
+                *(phys_to_virt(MAILBOX1_STATUS.into()).as_usize() as *const u32)
+            );
         }
 
         assert!((n_data & 0xF) == 0);
-        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data
+        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;
         // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
-    }
 
-    // let nResult: u32 = Read();
-    let mut n_result: u32 = 0;
+        // let nResult: u32 = Read();
+        let mut n_result: u32 = 0;
 
-    loop {
-        while (unsafe { *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32) }
-            & MAILBOX_STATUS_EMPTY
-            != 0)
-        {
-            // do nothing
+        loop {
+            while *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32)
+                & MAILBOX_STATUS_EMPTY
+                != 0
+            {
+                // do nothing
+                info!(
+                    "waiting...{:x}",
+                    *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32)
+                );
+            }
+
+            n_result = unsafe { *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32) };
+
+            if !((n_result & 0xF) != 8) {
+                break;
+            } // channel number is in the lower 4 bits
         }
+        // if (!m_bEarlyUse) {
+        //     s_SpinLock.Release();
+        // }
 
-        n_result = unsafe { *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32) };
-
-        if !((n_result & 0xF) != 8) {
-            break;
-        } // channel number is in the lower 4 bits
+        // PeripheralExit();
+        info!("n_result:{:x},and!0xf = {:x}", n_result, n_result & !0xF);
+        return n_result & !0xF;
     }
-
-    // if (!m_bEarlyUse) {
-    //     s_SpinLock.Release();
-    // }
-
-    // PeripheralExit();
-
-    return n_result & !0xF;
 }
