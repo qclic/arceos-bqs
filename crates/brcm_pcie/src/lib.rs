@@ -9,5 +9,5 @@ pub use bcm2711::*;
 
 /// sets bit 1 of [pcie->base+0x9210] to val
 pub trait BCM2711Hal {
-    fn sleep(ms:core::time::Duration);
+    fn sleep(ms: core::time::Duration);
 }

@@ -1,4 +1,5 @@
 //these code mainly inspired by circle:https://github.com/rsta2/circle
+use core::u128;
 
 use aarch64_cpu::asm::barrier::{self, ST, SY};
 use axhal::mem::{phys_to_virt, PhysAddr};
@@ -45,9 +46,9 @@ fn enable_device(address: usize) {
     info!("enable xhci!");
     const SLOT: usize = XHCI_PCIE_SLOT;
     const FUNC: usize = XHCI_PCIE_FUNC;
-    const CLASS_CODE: i32 = 0xC0330;
+    const CLASS_CODE: u64 = 0xC0330;
 
-    let conf: u64 = pcie_map_conf(1, ((((SLOT) & 0x1f) << 3) | ((FUNC) & 0x07)), 0, address);
+    let conf: u64 = pcie_map_conf(1, ((SLOT & 0x1f) << 3 | (FUNC & 0x07)) as u8, 0, address);
     if conf == 0 {
         panic!("enable failed 1");
     } else {
@@ -160,26 +161,31 @@ fn cfg_index(busnr: u8, devfn: u8, reg: u8) -> i32 {
 fn notify_reset() {}
 
 const TAG_XHCI_NOTIFY_RESET: usize = 0x00030058;
-const MEM_COHERENT_REGION: usize =
-    (((((((((0x8000 + (2 * 0x100000)) + 0x20000) + 0x20000 * (4 - 1) + 0x8000)
-        + 0x8000 * (4 - 1)
-        + 0x8000)
-        + 0x8000 * (4 - 1)
-        + 0x8000)
-        + 0x8000 * (4 - 1))
-        + 0x4000)
-        + 3 * 0x100000)
-        & !(2 * 0x100000 - 1));
+const MEM_COHERENT_REGION: usize = 0x8000
+    + 2 * 0x100000
+    + 0x20000
+    + 0x20000 * (4 - 1)
+    + 0x8000
+    + 0x8000 * (4 - 1)
+    + 0x8000
+    + 0x8000 * (4 - 1)
+    + 0x8000
+    + 0x8000 * (4 - 1)
+    + 0x4000
+    + 3 * 0x100000
+    & !(2 * 0x100000 - 1);
 
+#[allow(arithmetic_overflow)]
 fn get_tag() -> bool {
-    let property_tag = PropertyTag {
+    let mut property_tag = PropertyTag {
         n_tag_id: RESET_COMMAND,
         n_value_buf_size: 32,
         n_value_length: 4 & (!(1 << 32)),
     };
-    if (get_tags(property_tag)) {
+    if get_tags(&mut property_tag) {
         return false;
     }
+    return true;
 }
 
 const RESET_COMMAND: u32 = 1 << 20 | 0 << 15 | 0 << 12;
@@ -189,68 +195,117 @@ const CODE_RESPONSE_FAILURE: usize = 0x80000001;
 struct TPropertyBuffer {
     n_buffer_size: u32, // bytes
     n_code: u32,
-    tags: u128,
+    tags: PropertyTag,
 }
 
+#[derive(Clone, Copy)]
 struct PropertyTag {
     n_tag_id: u32,
     n_value_buf_size: u32, // bytes, multiple of 4
     n_value_length: u32,   // bytes
 }
 
-fn get_tags(prop_tag: PropertyTag) -> bool {
+fn get_tags(prop_tag: &mut PropertyTag) -> bool {
     let buffer_size: usize = 72 + 128 + 32;
-    let p_buffer = (phys_to_virt(MEM_COHERENT_REGION).as_usize() as *mut TPropertyBuffer);
+    let p_buffer = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize() as *mut TPropertyBuffer;
 
     unsafe {
-        (*p_buffer).n_buffer_size = buffer_size;
-        (*p_buffer).n_code = CODE_REQUEST;
-        (*p_buffer).tags = prop_tag as u128;
+        (*p_buffer).n_buffer_size = buffer_size as u32;
+        (*p_buffer).n_code = CODE_REQUEST as u32;
+        (*p_buffer).tags = *prop_tag;
 
-        let p_end_tag: u32 = (p_buffer as usize + 64 + 128) as *mut u32;
+        let p_end_tag = (p_buffer as usize + 64 + 128) as *mut u32;
 
         *p_end_tag = 0x00000000;
 
         // barr
         barrier::dsb(SY);
 
-        let n_buffer_address = (((p_buffer as usize) & !0xC0000000) | 0xC0000000);
+        let n_buffer_address = p_buffer as usize & !0xC0000000 | 0xC0000000;
 
-        if m_MailBox.WriteRead(n_buffer_address) != n_buffer_address {
-            return false;
-        }
+        // if m_MailBox.WriteRead(n_buffer_address) != n_buffer_address {
+        //     return false;
+        // }
 
         barrier::dmb(ST);
 
-        if (*p_buffer).n_code != CODE_RESPONSE_SUCCESS {
+        if (*p_buffer).n_code != CODE_RESPONSE_SUCCESS as u32 {
             return false;
         }
 
-        // memcpy(pTags, pBuffer->Tags, nTagsSize);
-        prop_tag = (*p_buffer).tags as PropertyTag;
+        *prop_tag = (*p_buffer).tags;
         return true;
     }
 }
 
-fn write_read(nData: u32) -> u32 {
+const MAILBOX0_STATUS: usize = 0xFE000000 + 0xB880 + 0x18;
+const MAILBOX0_READ: usize = 0xFE000000 + 0xB880 + 0x00;
+const MAILBOX_STATUS_EMPTY: u32 = 0x40000000;
+const MAILBOX_STATUS_FULL: u32 = 0x80000000;
+const MAILBOX1_STATUS: usize = 0xFE000000 + 0xB880 + 0x38;
+const MAILBOX1_WRITE: usize = 0xFE000000 + 0xB880 + 0x20;
+
+fn write_read(n_data: u32) -> u32 {
+    fn delay(seconds: u64) {
+        for i in 1..seconds + 1 {
+            fn fibonacci_recursive(n: u64) -> u64 {
+                if n == 0 {
+                    return 0;
+                }
+                if n == 1 {
+                    return 1;
+                }
+                return fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2);
+            }
+            fibonacci_recursive(36 + (i % 2));
+        }
+    }
     // PeripheralEntry();
 
-    if (!m_bEarlyUse) {
-        s_SpinLock.Acquire();
-        // spinlock::SpinNoIrq::
+    // if (!m_bEarlyUse) {
+    //     s_SpinLock.Acquire();
+    //     // spinlock::SpinNoIrq::
+    // }
+    //no need lock for now...?
+
+    unsafe {
+        // Flush();
+        while !((*(MAILBOX0_STATUS as *const u32) & MAILBOX_STATUS_EMPTY) != 0) {
+            *(MAILBOX0_READ as *const u32);
+
+            // CTimer::SimpleMsDelay(20);
+            delay(1)
+        }
+
+        // Write(n_data);
+        while (*(MAILBOX1_STATUS as *const u32) & MAILBOX_STATUS_FULL) != 0 {
+            // do nothing
+        }
+
+        assert!((n_data & 0xF) == 0);
+        *(MAILBOX1_WRITE as *mut u32) = 8 | n_data // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
     }
 
-    Flush();
+    // let nResult: u32 = Read();
+    let mut n_result: u32 = 0;
 
-    Write(nData);
+    loop {
+        while ((unsafe { *(MAILBOX0_STATUS as *const u32) } & MAILBOX_STATUS_EMPTY) != 0) {
+            // do nothing
+        }
 
-    let nResult: u32 = Read();
+        n_result = unsafe { *(MAILBOX0_READ as *const u32) };
 
-    if (!m_bEarlyUse) {
-        s_SpinLock.Release();
+        if !((n_result & 0xF) != 8) {
+            break;
+        } // channel number is in the lower 4 bits
     }
+
+    // if (!m_bEarlyUse) {
+    //     s_SpinLock.Release();
+    // }
 
     // PeripheralExit();
 
-    return nResult;
+    return n_result & !0xF;
 }
