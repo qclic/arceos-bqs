@@ -279,31 +279,41 @@ fn write_read(n_data: u32) -> u32 {
     unsafe {
         // Flush();
         //todo switch to virt add
-        while !((*(MAILBOX0_STATUS as *const u32) & MAILBOX_STATUS_EMPTY) != 0) {
-            *(MAILBOX0_READ as *const u32);
+        while !((*(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32)
+            & MAILBOX_STATUS_EMPTY)
+            != 0)
+        {
+            *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32);
 
             // CTimer::SimpleMsDelay(20);
             delay(1)
         }
 
         // Write(n_data);
-        while (*(MAILBOX1_STATUS as *const u32) & MAILBOX_STATUS_FULL) != 0 {
+        while (*(phys_to_virt(MAILBOX1_STATUS.into()).as_usize() as *const u32)
+            & MAILBOX_STATUS_FULL)
+            != 0
+        {
             // do nothing
         }
 
         assert!((n_data & 0xF) == 0);
-        *(MAILBOX1_WRITE as *mut u32) = 8 | n_data // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
+        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data
+        // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
     }
 
     // let nResult: u32 = Read();
     let mut n_result: u32 = 0;
 
     loop {
-        while (unsafe { *(MAILBOX0_STATUS as *const u32) } & MAILBOX_STATUS_EMPTY != 0) {
+        while (unsafe { *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32) }
+            & MAILBOX_STATUS_EMPTY
+            != 0)
+        {
             // do nothing
         }
 
-        n_result = unsafe { *(MAILBOX0_READ as *const u32) };
+        n_result = unsafe { *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32) };
 
         if !((n_result & 0xF) != 8) {
             break;
