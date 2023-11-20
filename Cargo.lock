@@ -964,6 +964,7 @@ dependencies = [
  "log",
  "page_table",
  "page_table_entry",
+ "spinlock",
  "xhci",
 ]
 
