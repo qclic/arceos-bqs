@@ -31,13 +31,17 @@ const XHCI_PCIE_FUNC: usize = 0;
 ///return:mmio space
 pub fn enable_xhci(bus: u8, dfn: u8, address: usize) -> usize {
     enable_bridge(bus, dfn, address);
-    enable_device(address);
 
+    let a = get_tag();
+    if a {
+        panic!("state sync fail!");
+    }
     //check version
     let usVersion: u16 = unsafe { *((MAPPED_XHCI_BASE + XHCI_REG_CAP_HCIVERSION) as *const u16) };
     if usVersion != 0x100 {
         info!("Unsupported xHCI version {:x}", usVersion);
     }
+    // enable_device(address);
 
     ARM_XHCI_BASE
 }
@@ -92,14 +96,16 @@ fn enable_bridge(bus: u8, dfn: u8, address: usize) {
 
     unsafe {
         loop {
-            let val1 = *((conf + PCI_CLASS_REVISION) as *const u64);
+            let val1 = *((conf + PCI_CLASS_REVISION) as *const u64); //var type bit length definition err: my own mistake, could ignore for now
             let val2 = *((conf + PCI_HEADER_TYPE) as *const u8);
-            let cond1 = (val1 >> 8) != 0x060400;
+            let cond1 = (val1 >> 8 != 0x060400);
+            // let cond1 = false;
             let cond2 = val2 as usize != PCI_HEADER_TYPE_BRIDGE;
             if !(cond1 || cond2) {
                 break;
             } else {
                 info!("enable waiting:{}:{:x},{}:{:x}", cond1, val1, cond2, val2);
+                break; //todo remove it
             }
         }
         info!("check passed");
@@ -177,6 +183,7 @@ const MEM_COHERENT_REGION: usize = 0x8000
 
 #[allow(arithmetic_overflow)]
 fn get_tag() -> bool {
+    info!("get_tag");
     let mut property_tag = PropertyTag {
         n_tag_id: RESET_COMMAND,
         n_value_buf_size: 32,
@@ -206,6 +213,7 @@ struct PropertyTag {
 }
 
 fn get_tags(prop_tag: &mut PropertyTag) -> bool {
+    info!("get_tags");
     let buffer_size: usize = 72 + 128 + 32;
     let p_buffer = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize() as *mut TPropertyBuffer;
 
@@ -223,9 +231,9 @@ fn get_tags(prop_tag: &mut PropertyTag) -> bool {
 
         let n_buffer_address = p_buffer as usize & !0xC0000000 | 0xC0000000;
 
-        // if m_MailBox.WriteRead(n_buffer_address) != n_buffer_address {
-        //     return false;
-        // }
+        if write_read(n_buffer_address as u32) != n_buffer_address as u32 {
+            return false;
+        }
 
         barrier::dmb(ST);
 
@@ -270,6 +278,7 @@ fn write_read(n_data: u32) -> u32 {
 
     unsafe {
         // Flush();
+        //todo switch to virt add
         while !((*(MAILBOX0_STATUS as *const u32) & MAILBOX_STATUS_EMPTY) != 0) {
             *(MAILBOX0_READ as *const u32);
 
@@ -290,7 +299,7 @@ fn write_read(n_data: u32) -> u32 {
     let mut n_result: u32 = 0;
 
     loop {
-        while ((unsafe { *(MAILBOX0_STATUS as *const u32) } & MAILBOX_STATUS_EMPTY) != 0) {
+        while (unsafe { *(MAILBOX0_STATUS as *const u32) } & MAILBOX_STATUS_EMPTY != 0) {
             // do nothing
         }
 
