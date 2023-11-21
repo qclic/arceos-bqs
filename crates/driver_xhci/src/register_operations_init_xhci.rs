@@ -215,7 +215,8 @@ struct PropertyTag {
 fn get_tags(prop_tag: &mut PropertyTag) -> bool {
     info!("get_tags");
     let buffer_size: usize = 72 + 128 + 32;
-    let p_buffer = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize() as *mut TPropertyBuffer;
+let p_buffer_address = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize();
+    let p_buffer = p_buffer_address as *mut TPropertyBuffer;
     info!("p_buffer:{:x}", p_buffer as usize);
 
     unsafe {
@@ -232,8 +233,8 @@ fn get_tags(prop_tag: &mut PropertyTag) -> bool {
 
         let n_buffer_address = p_buffer.addr() & !0xC0000000 | 0xC0000000;
 
-        if write_read(n_buffer_address as u32) != n_buffer_address as u32 {
-            info!("cond match:{:x}", n_buffer_address as u32);
+        if write_read(n_buffer_address) != n_buffer_address { //big issue with condition
+            info!("cond match:{:x}", *(n_buffer_address as *const u32));
             return false;
         }
 
@@ -263,7 +264,7 @@ const MAILBOX_STATUS_FULL: u32 = 0x80000000;
 const MAILBOX1_STATUS: usize = 0xFE000000 + 0xB880 + 0x38;
 const MAILBOX1_WRITE: usize = 0xFE000000 + 0xB880 + 0x20;
 
-fn write_read(n_data: u32) -> u32 {
+fn write_read(n_data: usize) -> usize {
     fn delay(seconds: u64) {
         for i in 1..seconds + 1 {
             fn fibonacci_recursive(n: u64) -> u64 {
@@ -313,7 +314,8 @@ fn write_read(n_data: u32) -> u32 {
         }
 
         assert!((n_data & 0xF) == 0);
-        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;
+        // *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;//probablity: issue at here
+        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;//probablity: issue at here, investgate:https://blog.csdn.net/qq_26989627/article/details/122024901
         // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
 
         // let nResult: u32 = Read();
