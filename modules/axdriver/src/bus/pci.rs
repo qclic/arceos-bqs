@@ -1,3 +1,5 @@
+use core::alloc::Layout;
+
 use crate::{prelude::*, AllDevices};
 use axhal::mem::phys_to_virt;
 use driver_pci::{
@@ -29,12 +31,13 @@ fn config_pci_device(
                             .expect("No memory ranges available for PCI BARs!")
                             .alloc(size as _)
                             .ok_or(DevError::NoMemory)?;
+                        // let alloced = global_allocator.alloc(Layout::for_value(&new_addr));
                         if address_type == MemoryBarType::Width32 {
                             root.set_bar_32(bdf, bar, new_addr as _);
-                            info!("type 32");
+                            // info!("type 32");
                         } else if address_type == MemoryBarType::Width64 {
                             root.set_bar_64(bdf, bar, new_addr);
-                            info!("type 64");
+                            // info!("type 64");
                         }
                     }
                 }
@@ -148,20 +151,21 @@ impl AllDevices {
         let mut allocator = axconfig::PCI_RANGES
             .get(1)
             .map(|range| PciRangeAllocator::new(range.0 as u64, range.1 as u64));
+        // let allocator = axalloc::global_allocator();
 
         // info!("pci_ranges = ({},{})", axconfig::PCI_RANGES.first());
 
         'out: for bus in 0..=axconfig::PCI_BUS_END as u8 {
-            info!("iter {bus}");
+            // info!("iter {bus}");
             for (bdf, dev_info) in root.enumerate_bus(bus) {
                 if !((dev_info.class == 0xc as u8) && (dev_info.subclass == 0x3 as u8)) {
                     continue;
                 } else {
                     debug!("PCI {}: {}", bdf, dev_info);
 
-                    info!("in!");
+                    // info!("in!");
                     if dev_info.header_type != HeaderType::Standard {
-                        info!("continue enum");
+                        // info!("continue enum");
                         continue;
                     }
 
@@ -189,10 +193,10 @@ impl AllDevices {
                             bdf, dev_info, e
                         ),
                     } //todo fix memory alloc
-                    info!("break!");
+                      // info!("break!");
                     break 'out;
                 }
-                info!("iter complete")
+                // info!("iter complete")
             }
         }
     }

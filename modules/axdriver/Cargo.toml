@@ -45,3 +45,5 @@ driver_xhci = {path = "../../crates/driver_xhci",optional = true}
 axalloc = { path = "../axalloc", optional = true }
 axhal = { path = "../axhal", optional = true }
 axconfig = { path = "../axconfig", optional = true }
+page_table_entry ={ path = "../../crates/page_table_entry"}
+page_table ={ path = "../../crates/page_table"}

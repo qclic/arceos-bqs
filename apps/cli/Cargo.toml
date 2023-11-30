@@ -21,4 +21,6 @@ arm_pl011 = { version = "0.1.0", path = "../../crates/arm_pl011" }
 brcm_pcie = {path = "../../crates/brcm_pcie"}
 axdriver ={ path = "../../modules/axdriver",features = ["xhci","bus-pci","ixgbe"]}
 driver_xhci = {path = "../../crates/driver_xhci"}
+axruntime = {path = "../../modules/axruntime", features = ["alloc","paging"]}
 axalloc = {path = "../../modules/axalloc"}
+axhal = {path = "../../modules/axhal"}

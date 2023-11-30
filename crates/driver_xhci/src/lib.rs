@@ -3,8 +3,12 @@
 #![no_std]
 #![feature(strict_provenance)]
 
-use core::{alloc::Layout, num::NonZeroUsize};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    num::NonZeroUsize,
+};
 
+use axalloc::GlobalAllocator;
 use axhal::mem::{phys_to_virt, virt_to_phys, PhysAddr, VirtAddr};
 #[doc(no_inline)]
 pub use driver_common::{BaseDriverOps, DevError, DevResult, DeviceType};
@@ -13,7 +17,7 @@ use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 use xhci::{accessor::Mapper, Registers};
 
 pub struct XhciController {
-    // pub controller: Registers<MemoryMapper>,
+    pub controller: Option<Registers<MemoryMapper>>,
 }
 
 pub const VL805_VENDOR_ID: u16 = 0x1106;
@@ -29,7 +33,6 @@ pub struct XhciInfo {}
 struct MemoryMapper;
 impl Mapper for MemoryMapper {
     unsafe fn map(&mut self, phys_base: usize, bytes: usize) -> NonZeroUsize {
-        // axalloc::global_allocator
         // let virt_to_phys = virt_to_phys(phys_base.into());
         // let from = A64PTE(phys_base);
 
@@ -40,14 +43,16 @@ impl Mapper for MemoryMapper {
         // info!("mapped");
         // let phys_to_virt = page_table::PagingIf::phys_to_virt(PhysAddr::from(phys_base));
         info!("mapping:{:x}", phys_base);
-        let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base));
+
+        return NonZeroUsize::new_unchecked(phys_base);
+        // let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base));
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
         // return NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
 
-        let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
-        info!("return:{:x},byte:{:x}", ret, bytes);
-        return ret;
+        // let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
+        // info!("return:{:x},byte:{:x}", ret, bytes);
+        // return ret;
     }
 
     fn unmap(&mut self, virt_base: usize, bytes: usize) {
@@ -58,9 +63,11 @@ impl Mapper for MemoryMapper {
 impl XhciController {
     pub fn init(add: usize) -> XhciController {
         // let config_enable = phys_to_virt(PhysAddr::from(0xFA000000));
+        // let config_enable: usize = 0x6_0000_0000;
         // unsafe {
         //     info!("writing!");
-        //     while let stat = (*(config_enable.as_usize() as *const u16)) as u16 == 0x10 {
+        //     // while let stat = (*(config_enable.as_usize() as *const u16)) as u16 == 0x10 {
+        //     while let stat = (*(config_enable as *const u16)) as u16 == 0x10 {
         //         *((add + 0x04) as *mut u16) = 326;
         //         info!("status:{}", stat);
         //     }
@@ -68,9 +75,11 @@ impl XhciController {
         // }
         info!("received address:{:x}", add);
         XhciController {
-            // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
-            // controller: unsafe { xhci::Registers::new(add, MemoryMapper {}) },
+            controller: Some(unsafe { xhci::Registers::new(add, MemoryMapper {}) }),
         }
+
+        // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
+        // XhciController { controller: None }
     }
 }
 

@@ -1,3 +1,4 @@
+use axhal::mem::PhysAddr;
 use core::f32::consts::E;
 use std::io::{self};
 
@@ -24,6 +25,7 @@ const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("test", do_test),
     ("move", do_m0ve),
     ("tud", test_usb_driver),
+    ("test_flag", test_flag),
 ];
 
 fn do_uname(_args: &str) {
@@ -273,7 +275,7 @@ fn do_test(args: &str) {
 
 //brokkkkkken key board
 use arm_pl011::pl011::Pl011Uart;
-use axalloc::GlobalAllocator;
+use axalloc::{GlobalAllocator, GlobalPage};
 use brcm_pcie::BCM2711PCIeHostBridge;
 
 use crate::{enable_pcie, BridgeImpl};
@@ -444,10 +446,11 @@ fn do_m0ve(args: &str) {
     }
 }
 
-// #[global_allocator]
-// static global_allocator: &GlobalAllocator = axalloc::global_allocator();
-
 fn test_usb_driver(str: &str) {
     enable_pcie();
     axdriver::init_drivers();
+}
+
+fn test_flag(str: &str) {
+    println!("{}", unsafe { axhal::flag });
 }

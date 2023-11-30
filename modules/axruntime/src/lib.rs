@@ -211,18 +211,21 @@ fn init_allocator() {
     let mut max_region_paddr = 0.into();
     for r in memory_regions() {
         if r.flags.contains(MemRegionFlags::FREE) && r.size > max_region_size {
+            info!("allocating {:x}", r.paddr.as_usize());
             max_region_size = r.size;
             max_region_paddr = r.paddr;
         }
     }
     for r in memory_regions() {
         if r.flags.contains(MemRegionFlags::FREE) && r.paddr == max_region_paddr {
+            info!("allocating {:x}", r.paddr.as_usize());
             axalloc::global_init(phys_to_virt(r.paddr).as_usize(), r.size);
             break;
         }
     }
     for r in memory_regions() {
         if r.flags.contains(MemRegionFlags::FREE) && r.paddr != max_region_paddr {
+            info!("allocating {:x}", r.paddr.as_usize());
             axalloc::global_add_memory(phys_to_virt(r.paddr).as_usize(), r.size)
                 .expect("add heap memory region failed");
         }
@@ -240,6 +243,7 @@ fn remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
     if axhal::cpu::this_cpu_is_bsp() {
         let mut kernel_page_table = PageTable::try_new()?;
         for r in memory_regions() {
+            info!("allocating {:x}", r.paddr.as_usize());
             kernel_page_table.map_region(
                 phys_to_virt(r.paddr),
                 r.paddr,

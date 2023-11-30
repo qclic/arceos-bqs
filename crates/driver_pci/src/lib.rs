@@ -37,7 +37,7 @@ pub fn op_spec_mmio_device<OpMMIODevice, OpPCIDevice, DeviceFilter>(
     OpPCIDevice: Fn(PciTransport),
     DeviceFilter: Fn(&DeviceFunctionInfo) -> bool,
 {
-    info!("driver pci started.");
+    // info!("driver pci started.");
     // info!("Loading FDT from {:x}", mmio_base);
     // Safe because the pointer is a valid pointer to unaliased memory.
     // let fdt = unsafe { Fdt::from_ptr(mmio_base as *const u8).unwrap() }; // fix this stuff
@@ -89,11 +89,11 @@ pub fn op_spec_mmio_device<OpMMIODevice, OpPCIDevice, DeviceFilter>(
     }
 
     if let Some(pci_node) = fdt.find_compatible(&["pci-host-cam-generic"]) {
-        info!("Found PCI node: {}", pci_node.name);
+        // info!("Found PCI node: {}", pci_node.name);
         enumerate_pci(pci_node, Cam::MmioCam, &op_pci_device, &device_filter);
     }
     if let Some(pcie_node) = fdt.find_compatible(&["pci-host-ecam-generic"]) {
-        info!("Found PCIe node: {}", pcie_node.name);
+        // info!("Found PCIe node: {}", pcie_node.name);
         enumerate_pci(pcie_node, Cam::Ecam, &op_pci_device, &device_filter);
     }
 }

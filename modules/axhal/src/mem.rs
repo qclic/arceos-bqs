@@ -72,6 +72,7 @@ pub const fn phys_to_virt(paddr: PhysAddr) -> VirtAddr {
 
 /// Returns an iterator over all physical memory regions.
 pub fn memory_regions() -> impl Iterator<Item = MemRegion> {
+    info!("mem_regions");
     kernel_image_regions().chain(crate::platform::mem::platform_regions())
 }
 

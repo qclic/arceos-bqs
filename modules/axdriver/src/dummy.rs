@@ -120,7 +120,7 @@ cfg_if! {
             fn info(&self) -> driver_xhci::DisplayInfo {
                 self::XhciInfo
             }
-            fn device_name -> &str{
+            fn device_name(&self) -> &str{
                 "xhci-controller"
             }
         }

@@ -43,6 +43,8 @@ pub mod mem;
 pub mod time;
 pub mod trap;
 
+pub static mut flag: bool = false;
+
 #[cfg(feature = "tls")]
 pub mod tls;
 

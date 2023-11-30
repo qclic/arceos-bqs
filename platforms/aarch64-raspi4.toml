@@ -20,8 +20,10 @@ phys-virt-offset = "0xffff_0000_0000_0000"
 mmio-regions = [
     ["0xFE20_1000", "0x1000"],      # PL011 UART
     ["0xFF84_1000", "0x8000"],      # GICv2
-    ["0xFD50_0000", "0x9310"],      # pcie ecam
-    ["0xF8000000", "0x4000000"],      # pcie
+    # ["0xFD50_0000", "0x9310"],      # pcie ecam
+    ["0xFD50_0000", "0xA000"],      # pcie ecam
+    # ["0xF8000000", "0x4000000"],      # pcie
+    ["0x6_0000_0000", "0x1000"],   # xhci
 ]
 virtio-mmio-regions = []
 # UART Address
@@ -40,7 +42,7 @@ pci-ranges = [
     # ["0x1000_0000", "0x2eff_0000"],         # 32-bit MMIO space
     ["0x00","0x3800000"],
     # ["0x6_0000_0000", "0x7_FFFF_FFFF"],   # 64-bit MMIO space
-    ["0x6_0000_0000", "0x7_FFFF_FFFF"],   # 64-bit MMIO space
+    ["0x6_0000_0000", "0x6_0000_0fff"],   # xhci space: https://blog.csdn.net/qq_26989627/article/details/122024901
     # ["0xFD50_0000", "0xFD50_9310"],      # pcie
     # ["0x04","0x7c000000"],
 ] #TODO: findout ranges

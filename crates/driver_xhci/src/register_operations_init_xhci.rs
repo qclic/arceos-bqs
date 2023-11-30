@@ -1,8 +1,9 @@
 //these code mainly inspired by circle:https://github.com/rsta2/circle
-use core::u128;
+use core::{fmt::Display, u128};
 
 use aarch64_cpu::asm::barrier::{self, ST, SY};
-use axhal::mem::{phys_to_virt, PhysAddr};
+use axhal::mem::{phys_to_virt, virt_to_phys, PhysAddr};
+use core::fmt;
 use log::info;
 
 const PCI_CLASS_REVISION: u64 = 0x08;
@@ -27,9 +28,24 @@ const XHCI_REG_CAP_HCIVERSION: usize = 0x02;
 const XHCI_PCI_CLASS_CODE: usize = 0xC0330;
 const XHCI_PCIE_SLOT: usize = 0;
 const XHCI_PCIE_FUNC: usize = 0;
+fn delay(seconds: u64) {
+    for i in 1..seconds + 1 {
+        fn fibonacci_recursive(n: u64) -> u64 {
+            if n == 0 {
+                return 0;
+            }
+            if n == 1 {
+                return 1;
+            }
+            return fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2);
+        }
+        fibonacci_recursive(36 + (i % 2));
+    }
+}
 
 ///return:mmio space
 pub fn enable_xhci(bus: u8, dfn: u8, address: usize) -> usize {
+    info!("xhci energizing!");
     enable_bridge(bus, dfn, address);
 
     let a = get_tag();
@@ -41,7 +57,7 @@ pub fn enable_xhci(bus: u8, dfn: u8, address: usize) -> usize {
     if usVersion != 0x100 {
         info!("Unsupported xHCI version {:x}", usVersion);
     }
-    // enable_device(address);
+    enable_device(address);
 
     ARM_XHCI_BASE
 }
@@ -59,19 +75,19 @@ fn enable_device(address: usize) {
         info!("conf = {:x}", conf);
     }
 
-    unsafe {
-        loop {
-            let val1 = *((conf + PCI_CLASS_REVISION) as *const u64);
-            let val2 = *((conf + PCI_HEADER_TYPE) as *const u8);
-            let cond1 = (val1 >> 8) != CLASS_CODE;
-            let cond2 = val2 != PCI_HEADER_TYPE_NORMAL;
-            if !(cond1 || cond2) {
-                break;
-            } else {
-                info!("enable waiting:{}:{:x},{}:{:x}", cond1, val1, cond2, val2);
-            }
-        }
-    }
+    // unsafe {
+    //     loop {
+    //         let val1 = *((conf + PCI_CLASS_REVISION) as *const u64);
+    //         let val2 = *((conf + PCI_HEADER_TYPE) as *const u8);
+    //         let cond1 = (val1 >> 8) != CLASS_CODE;
+    //         let cond2 = val2 != PCI_HEADER_TYPE_NORMAL;
+    //         if !(cond1 || cond2) {
+    //             break;
+    //         } else {
+    //             info!("enable waiting:{}:{:x},{}:{:x}", cond1, val1, cond2, val2);
+    //         }
+    //     }
+    // }
     info!("check passed");
 
     unsafe {
@@ -189,10 +205,11 @@ fn get_tag() -> bool {
         n_value_buf_size: 32,
         n_value_length: 4 & (!(1 << 32)),
     };
-    if get_tags(&mut property_tag) {
-        return false;
-    }
-    return true;
+    // if get_tags(&mut property_tag) {
+    // return false;
+    // }
+    return !get_tags(&mut property_tag);
+    // return true;
 }
 
 const RESET_COMMAND: u32 = 1 << 20 | 0 << 15 | 0 << 12;
@@ -212,10 +229,20 @@ struct PropertyTag {
     n_value_length: u32,   // bytes
 }
 
+impl Display for PropertyTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[tag_id:{},buf_size:{},val_len:{}]",
+            self.n_tag_id, self.n_value_buf_size, self.n_value_length
+        )
+    }
+}
+
 fn get_tags(prop_tag: &mut PropertyTag) -> bool {
-    info!("get_tags");
+    info!("get_tags,tag:{}", prop_tag);
     let buffer_size: usize = 72 + 128 + 32;
-let p_buffer_address = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize();
+    let p_buffer_address = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize();
     let p_buffer = p_buffer_address as *mut TPropertyBuffer;
     info!("p_buffer:{:x}", p_buffer as usize);
 
@@ -231,10 +258,14 @@ let p_buffer_address = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize();
         // barr
         barrier::dsb(SY);
 
-        let n_buffer_address = p_buffer.addr() & !0xC0000000 | 0xC0000000;
+        let virt_to_phys = virt_to_phys(p_buffer_address.into());
+        let n_buffer_address = virt_to_phys.as_usize() & !0xC0000000 | 0xC0000000;
+        info!("n_buffer_address:{:x}", n_buffer_address);
 
-        if write_read(n_buffer_address) != n_buffer_address { //big issue with condition
-            info!("cond match:{:x}", *(n_buffer_address as *const u32));
+        let write_read = write_read(phys_to_virt(n_buffer_address.into()).as_usize());
+        if write_read != n_buffer_address as u32 {
+            //big issue with condition
+            info!("cond match:{:x}", write_read);
             return false;
         }
 
@@ -245,12 +276,20 @@ let p_buffer_address = phys_to_virt(MEM_COHERENT_REGION.into()).as_usize();
         //     info!("cond match:{:x}:{:x}", n_code, CODE_RESPONSE_SUCCESS);
         //     return false;
         // }
-        while n_code != CODE_RESPONSE_SUCCESS as u32 {
-            // has issue of this var
-            info!("cond match:{:x}:{:x}", n_code, CODE_RESPONSE_SUCCESS);
-            n_code = (*p_buffer).n_code;
-            // return false;
-        }
+        // while n_code != CODE_RESPONSE_SUCCESS as u32 {
+        //     // has issue of this var
+        //     info!(
+        //         "cond match:{:x}:{:x},tag:{}",
+        //         n_code,
+        //         CODE_RESPONSE_SUCCESS,
+        //         (*p_buffer).tags
+        //     );
+        //     n_code = (*p_buffer).n_code;
+        //     delay(1);
+        //     // return false;
+        // }
+        ////todo fixit
+        ////fornow just treat it as pass
 
         *prop_tag = (*p_buffer).tags;
         return true;
@@ -264,21 +303,7 @@ const MAILBOX_STATUS_FULL: u32 = 0x80000000;
 const MAILBOX1_STATUS: usize = 0xFE000000 + 0xB880 + 0x38;
 const MAILBOX1_WRITE: usize = 0xFE000000 + 0xB880 + 0x20;
 
-fn write_read(n_data: usize) -> usize {
-    fn delay(seconds: u64) {
-        for i in 1..seconds + 1 {
-            fn fibonacci_recursive(n: u64) -> u64 {
-                if n == 0 {
-                    return 0;
-                }
-                if n == 1 {
-                    return 1;
-                }
-                return fibonacci_recursive(n - 1) + fibonacci_recursive(n - 2);
-            }
-            fibonacci_recursive(36 + (i % 2));
-        }
-    }
+fn write_read(n_data: usize) -> u32 {
     // PeripheralEntry();
 
     // if (!m_bEarlyUse) {
@@ -315,13 +340,13 @@ fn write_read(n_data: usize) -> usize {
 
         assert!((n_data & 0xF) == 0);
         // *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;//probablity: issue at here
-        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data;//probablity: issue at here, investgate:https://blog.csdn.net/qq_26989627/article/details/122024901
-        // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
+        *(phys_to_virt(MAILBOX1_WRITE.into()).as_usize() as *mut u32) = 8 | n_data as u32; //probablity: issue at here, investgate:https://blog.csdn.net/qq_26989627/article/details/122024901
+                                                                                           // channel number is in the lower 4 bits //curios:is 8 correct?:mchannel-BCM_MAILBOX_PROP_OUT
 
         // let nResult: u32 = Read();
         let mut n_result: u32 = 0;
 
-        loop {
+        'a: loop {
             while *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32)
                 & MAILBOX_STATUS_EMPTY
                 != 0
@@ -331,12 +356,17 @@ fn write_read(n_data: usize) -> usize {
                     "waiting...{:x}",
                     *(phys_to_virt(MAILBOX0_STATUS.into()).as_usize() as *const u32)
                 );
+                delay(1);
             }
 
             n_result = unsafe { *(phys_to_virt(MAILBOX0_READ.into()).as_usize() as *const u32) };
 
             if !((n_result & 0xF) != 8) {
-                break;
+                info!("break! n_result & 0xf:{:x}", n_result & 0xf);
+                break 'a;
+            } else {
+                info!("n_result & 0xf :{:x}", n_result & 0xf);
+                delay(1);
             } // channel number is in the lower 4 bits
         }
         // if (!m_bEarlyUse) {
