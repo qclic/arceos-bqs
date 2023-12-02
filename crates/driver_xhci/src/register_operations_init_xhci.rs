@@ -312,6 +312,8 @@ fn write_read(n_data: usize) -> u32 {
     // }
     //no need lock for now...?
 
+    info!("wrte read:{}", n_data);
+
     unsafe {
         // Flush();
         //todo switch to virt add

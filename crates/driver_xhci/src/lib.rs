@@ -55,9 +55,7 @@ impl Mapper for MemoryMapper {
         // return ret;
     }
 
-    fn unmap(&mut self, virt_base: usize, bytes: usize) {
-        unimplemented!()
-    }
+    fn unmap(&mut self, virt_base: usize, bytes: usize) {}
 }
 
 impl XhciController {
