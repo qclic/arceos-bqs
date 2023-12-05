@@ -174,15 +174,15 @@ cfg_if::cfg_if! {
                         Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
                             info!("vl805 found! at {:?}",bdf);
                             let bar_info = root.bar_info(bdf, 0).unwrap();
-                            let caps = root.capabilities(bdf)
-                            let cap_offset = caps.map(|a| a.offset).sum()
+                            let caps = root.capabilities(bdf);
+                            let cap_offset:u64 = caps.map(|a| a.offset as u64).sum();
                             const PCI_COMMAND_PARITY:u16 = 0x40;
                             //info!("{}",bar_info);
                             // unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
                             match bar_info {
                             driver_pci::BarInfo::Memory{address,size, ..}=>{
                             info!("enabling!");
-                            
+
                             // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
                             // // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  phys_to_virt((0x10_0000 as usize).into()));
                             // loop {
@@ -209,7 +209,9 @@ cfg_if::cfg_if! {
                                                 // phys_to_virt((0x600000000 as usize).into()).as_usize()
                                                 // phys_to_virt((0x10_0000 as usize).into()).as_usize()
                                                 // 0x600000000 as usize
-                                                address,size,cap_offset
+                                                address as usize,
+                                                size as usize,
+                                                cap_offset as usize
                                             )
                                         )
                                 );
