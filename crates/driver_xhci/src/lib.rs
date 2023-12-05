@@ -22,6 +22,7 @@ pub struct XhciController {
 
 pub const VL805_VENDOR_ID: u16 = 0x1106;
 pub const VL805_DEVICE_ID: u16 = 0x3483;
+pub const VL805_MMIO_BASE: usize = 0x6_0000_0000;
 
 pub mod register_operations_init_xhci;
 
@@ -48,15 +49,15 @@ impl Mapper for MemoryMapper {
         info!("mapping:{:x}", phys_base);
 
         // return NonZeroUsize::new_unchecked(phys_base + self.addr_offset);
-        return NonZeroUsize::new_unchecked(phys_base);
-        // let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base));
+        // return NonZeroUsize::new_unchecked(phys_to_virt(phys_base.into()).as_usize());
+        let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base >> 1 << 1));
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
         // return NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
 
-        // let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
-        // info!("return:{:x},byte:{:x}", ret, bytes);
-        // return ret;
+        let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
+        info!("return:{:x},byte:{:x}", ret, bytes);
+        return ret;
     }
 
     fn unmap(&mut self, virt_base: usize, bytes: usize) {}
@@ -81,19 +82,19 @@ impl XhciController {
         // }
 
         info!("received address:{:x}", pci_bar_address);
-        XhciController {
-            controller: Some(unsafe {
-                xhci::Registers::new(
-                    pci_bar_address + cap_offset_usize,
-                    MemoryMapper {
-                        // addr_offset: cap_offset_usize,
-                    },
-                )
-            }),
-        }
+        // XhciController {
+        //     controller: Some(unsafe {
+        //         xhci::Registers::new(
+        //             pci_bar_address + cap_offset_usize,
+        //             MemoryMapper {
+        //                 // addr_offset: cap_offset_usize,
+        //             },
+        //         )
+        //     }),
+        // }
 
         // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
-        // XhciController { controller: None }
+        XhciController { controller: None }
     }
 }
 

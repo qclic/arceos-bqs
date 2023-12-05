@@ -25,7 +25,7 @@ const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("test", do_test),
     ("move", do_m0ve),
     ("tud", test_usb_driver),
-    ("test_flag", test_flag),
+    ("enable_pci", enable_pci),
 ];
 
 fn do_uname(_args: &str) {
@@ -447,10 +447,9 @@ fn do_m0ve(args: &str) {
 }
 
 fn test_usb_driver(str: &str) {
-    enable_pcie();
     axdriver::init_drivers();
 }
 
-fn test_flag(str: &str) {
-    println!("{}", unsafe { axhal::flag });
+fn enable_pci(str: &str) {
+    enable_pcie();
 }

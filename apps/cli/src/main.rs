@@ -53,7 +53,7 @@ fn main() {
     let mut buf = [0; MAX_CMD_LEN];
     let mut cursor = 0;
 
-    enable_pcie();
+    // enable_pcie();
 
     cmd::run_cmd("help".as_bytes());
     print_prompt();

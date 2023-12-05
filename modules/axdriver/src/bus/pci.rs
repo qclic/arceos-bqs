@@ -140,10 +140,10 @@ fn config_pci_device(
 // }
 impl AllDevices {
     pub(crate) fn probe_bus_devices(&mut self) {
-        // let base_vaddr = phys_to_virt(axconfig::PCI_ECAM_BASE.into());
+        let base_vaddr = phys_to_virt(axconfig::PCI_ECAM_BASE.into());
         // let base_paddr: usize = 0x6_0000_0000;
-        let base_paddr: usize = 0xfd50_0000;
-        let base_vaddr = phys_to_virt(base_paddr.into());
+        // let base_paddr: usize = 0xfd50_0000;
+        // let base_vaddr = phys_to_virt(base_paddr.into());
         info!("base_vaddr:{:x}", base_vaddr.as_usize());
         let mut root = unsafe { PciRoot::new(base_vaddr.as_mut_ptr(), Cam::Ecam) };
 
@@ -159,6 +159,7 @@ impl AllDevices {
             // info!("iter {bus}");
             for (bdf, dev_info) in root.enumerate_bus(bus) {
                 if !((dev_info.class == 0xc as u8) && (dev_info.subclass == 0x3 as u8)) {
+                    //hard code, need modify
                     continue;
                 } else {
                     debug!("PCI {}: {}", bdf, dev_info);
