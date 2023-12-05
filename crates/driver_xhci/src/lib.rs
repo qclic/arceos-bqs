@@ -30,7 +30,10 @@ pub mod register_operations_init_xhci;
 pub struct XhciInfo {}
 
 #[derive(Clone)]
-struct MemoryMapper;
+struct MemoryMapper{
+    addr_offset:usize,
+}
+
 impl Mapper for MemoryMapper {
     unsafe fn map(&mut self, phys_base: usize, bytes: usize) -> NonZeroUsize {
         // let virt_to_phys = virt_to_phys(phys_base.into());
@@ -44,7 +47,7 @@ impl Mapper for MemoryMapper {
         // let phys_to_virt = page_table::PagingIf::phys_to_virt(PhysAddr::from(phys_base));
         info!("mapping:{:x}", phys_base);
 
-        return NonZeroUsize::new_unchecked(phys_base);
+        return NonZeroUsize::new_unchecked(phys_base + self.addr_offset);
         // let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base));
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
@@ -59,7 +62,7 @@ impl Mapper for MemoryMapper {
 }
 
 impl XhciController {
-    pub fn init(add: usize) -> XhciController {
+    pub fn init(pci_bar_address: usize,bar_size:usize,cap_offset_usize:usize) -> XhciController {
         // let config_enable = phys_to_virt(PhysAddr::from(0xFA000000));
         // let config_enable: usize = 0x6_0000_0000;
         // unsafe {
@@ -71,9 +74,10 @@ impl XhciController {
         //     }
         //     info!("writed!");
         // }
+
         info!("received address:{:x}", add);
         XhciController {
-            controller: Some(unsafe { xhci::Registers::new(add, MemoryMapper {}) }),
+            controller: Some(unsafe { xhci::Registers::new(add, MemoryMapper { addr_offset: cap_offset_usize }) }),
         }
 
         // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
