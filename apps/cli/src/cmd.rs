@@ -73,8 +73,8 @@ fn do_ldr(args: &str) {
         println!("Parsed address: {:p}", address); // 打印地址时使用 %p 格式化符号
 
         unsafe {
-            value = *address.clone();
-            conv_val = (value >> (8 * (4 - addr_offset.1))) & 0x00ff;
+            value = (*address).clone();
+            conv_val = (value >> (8 * (4 - addr_offset.1))) & 0x00000000ffffffff;
         }
 
         println!(

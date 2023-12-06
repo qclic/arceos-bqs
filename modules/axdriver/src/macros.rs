@@ -72,7 +72,7 @@ macro_rules! for_each_drivers {
             type $drv_type = crate::drivers::IxgbeDriver;
             $code
         }
-        #[cfg(net_dev = "xhci")]
+        #[cfg(xhci_dev = "xhci")]
         {
             type $drv_type = crate::drivers::XhciDriver;
             $code

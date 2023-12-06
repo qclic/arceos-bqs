@@ -90,20 +90,62 @@ cfg_if::cfg_if! {
                     bdf: DeviceFunction,
                     dev_info: &DeviceFunctionInfo,
                 ) -> Option<AxDeviceEnum> {
+                    info!("searched!");
                     use driver_xhci::{VL805_VENDOR_ID,VL805_DEVICE_ID};
                     //todo add ah118 device detect
                     match Some((dev_info.vendor_id,dev_info.device_id)) {
                         Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
-                            //info!("vl805 found! at {:?}",bdf);
+                            info!("vl805 found! at {:?}",bdf);
                             let bar_info = root.bar_info(bdf, 0).unwrap();
+                            let caps = root.capabilities(bdf);
+                            let cap_offset:u64 = caps.map(|a| a.offset as u64).sum();
+                            const PCI_COMMAND_PARITY:u16 = 0x40;
+                            //info!("{}",bar_info);
+                            //TODO 问题解决方案可能在这里，记得研究一下
+                            unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
                             match bar_info {
-                                driver_pci::BarInfo::Memory{address,size, ..}=>{
-                                    // return Some(AxDeviceEnum::XHCI(XhciController::init(address as usize)));
-                                    return None;
+                            driver_pci::BarInfo::Memory{address,size, ..}=>{
+                            info!("enabling!");
+
+                            // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
+                            // // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  phys_to_virt((0x10_0000 as usize).into()));
+                            // loop {
+
+                            //     let stat = root.get_status_command(bdf).0.bits();
+                            //     let command = root.get_status_command(bdf).1.bits();
+
+                            //     // info!("status:{:x}",stat);
+                            //     // info!("command:{:x}",command);
+                            //     if stat != 0x10{
+                            //         break;
+                            //     }
+                            // }
+
+                            // let entry = page_table_entry::aarch64::A64PTE::new_page(PhysAddr::from(address as usize), MappingFlags::all(), true);
+                            // let page = axalloc::global_allocator().alloc_pages(1, 1024)
+                            // axalloc::GlobalPage::start_paddr(&self, virt_to_phys)
+
+                                    return Some(
+                                        AxDeviceEnum::XHCI(
+                                            XhciController::init(
+                                                // phys_to_virt(entry.paddr()).into()
+                                                // mmio as usize
+                                                // phys_to_virt((0x600000000 as usize).into()).as_usize()
+                                                // phys_to_virt((0x10_0000 as usize).into()).as_usize()
+                                                // 0x600000000 as usize
+                                                address as usize,
+                                                size as usize,
+                                                cap_offset as usize
+                                            )
+                                        )
+                                );
+                                // return  None;
+                                // return Some(AxDeviceEnum::XHCI(XhciController{}))
                                 }
                                 _=>return None
                             // return Some(AxDeviceEnum::from_xhci(dev))
                         }
+
                     }
                     _ => None
                 }
@@ -171,57 +213,58 @@ cfg_if::cfg_if! {
                             }
                         }
                         },
-                        Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
-                            info!("vl805 found! at {:?}",bdf);
-                            let bar_info = root.bar_info(bdf, 0).unwrap();
-                            let caps = root.capabilities(bdf);
-                            let cap_offset:u64 = caps.map(|a| a.offset as u64).sum();
-                            const PCI_COMMAND_PARITY:u16 = 0x40;
-                            //info!("{}",bar_info);
-                            // unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
-                            match bar_info {
-                            driver_pci::BarInfo::Memory{address,size, ..}=>{
-                            info!("enabling!");
 
-                            // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
-                            // // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  phys_to_virt((0x10_0000 as usize).into()));
-                            // loop {
+                    //     Some((VL805_VENDOR_ID,VL805_DEVICE_ID))=>{
+                    //         info!("vl805 found! at {:?}",bdf);
+                    //         let bar_info = root.bar_info(bdf, 0).unwrap();
+                    //         let caps = root.capabilities(bdf);
+                    //         let cap_offset:u64 = caps.map(|a| a.offset as u64).sum();
+                    //         const PCI_COMMAND_PARITY:u16 = 0x40;
+                    //         //info!("{}",bar_info);
+                    //         // unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
+                    //         match bar_info {
+                    //         driver_pci::BarInfo::Memory{address,size, ..}=>{
+                    //         info!("enabling!");
 
-                            //     let stat = root.get_status_command(bdf).0.bits();
-                            //     let command = root.get_status_command(bdf).1.bits();
+                    //         let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
+                    //         // // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  phys_to_virt((0x10_0000 as usize).into()));
+                    //         // loop {
 
-                            //     // info!("status:{:x}",stat);
-                            //     // info!("command:{:x}",command);
-                            //     if stat != 0x10{
-                            //         break;
-                            //     }
-                            // }
+                    //         //     let stat = root.get_status_command(bdf).0.bits();
+                    //         //     let command = root.get_status_command(bdf).1.bits();
 
-                            // let entry = page_table_entry::aarch64::A64PTE::new_page(PhysAddr::from(address as usize), MappingFlags::all(), true);
-                            // let page = axalloc::global_allocator().alloc_pages(1, 1024)
-                            // axalloc::GlobalPage::start_paddr(&self, virt_to_phys)
+                    //         //     // info!("status:{:x}",stat);
+                    //         //     // info!("command:{:x}",command);
+                    //         //     if stat != 0x10{
+                    //         //         break;
+                    //         //     }
+                    //         // }
 
-                                    return Some(
-                                        AxDeviceEnum::XHCI(
-                                            XhciController::init(
-                                                // phys_to_virt(entry.paddr()).into()
-                                                // mmio as usize
-                                                // phys_to_virt((0x600000000 as usize).into()).as_usize()
-                                                // phys_to_virt((0x10_0000 as usize).into()).as_usize()
-                                                // 0x600000000 as usize
-                                                address as usize,
-                                                size as usize,
-                                                cap_offset as usize
-                                            )
-                                        )
-                                );
-                                // return  None;
-                                // return Some(AxDeviceEnum::XHCI(XhciController{}))
-                                }
-                                _=>return None
-                            // return Some(AxDeviceEnum::from_xhci(dev))
-                        }
-                    }
+                    //         // let entry = page_table_entry::aarch64::A64PTE::new_page(PhysAddr::from(address as usize), MappingFlags::all(), true);
+                    //         // let page = axalloc::global_allocator().alloc_pages(1, 1024)
+                    //         // axalloc::GlobalPage::start_paddr(&self, virt_to_phys)
+
+                    //                 return Some(
+                    //                     AxDeviceEnum::XHCI(
+                    //                         XhciController::init(
+                    //                             // phys_to_virt(entry.paddr()).into()
+                    //                             // mmio as usize
+                    //                             // phys_to_virt((0x600000000 as usize).into()).as_usize()
+                    //                             // phys_to_virt((0x10_0000 as usize).into()).as_usize()
+                    //                             // 0x600000000 as usize
+                    //                             address as usize,
+                    //                             size as usize,
+                    //                             cap_offset as usize
+                    //                         )
+                    //                     )
+                    //             );
+                    //             // return  None;
+                    //             // return Some(AxDeviceEnum::XHCI(XhciController{}))
+                    //             }
+                    //             _=>return None
+                    //         // return Some(AxDeviceEnum::from_xhci(dev))
+                    //     }
+                    // }
                     _ => None
                 }
             }

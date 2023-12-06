@@ -16,7 +16,6 @@ bus-pci = ["dep:driver_pci", "dep:axhal", "dep:axconfig"]
 net = ["driver_net"]
 block = ["driver_block"]
 display = ["driver_display"]
-xhci = ["driver_xhci"]
 
 # Enabled by features `virtio-*`
 virtio = ["driver_virtio", "dep:axalloc", "dep:axhal", "dep:axconfig"]
@@ -28,6 +27,7 @@ virtio-gpu = ["display", "virtio", "driver_virtio/gpu"]
 ramdisk = ["block", "driver_block/ramdisk"]
 bcm2835-sdhci = ["block", "driver_block/bcm2835-sdhci"]
 ixgbe = ["net", "driver_net/ixgbe", "dep:axalloc", "dep:axhal"]
+xhci = ["driver_xhci","dep:axalloc","dep:axhal"]
 # more devices example: e1000 = ["net", "driver_net/e1000"]
 
 default = ["bus-mmio"]

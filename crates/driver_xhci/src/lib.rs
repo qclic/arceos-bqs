@@ -81,7 +81,12 @@ impl XhciController {
         //     info!("writed!");
         // }
 
-        info!("received address:{:x}", pci_bar_address);
+        info!(
+            "received address:{:x},offset:{:x},offseted:{:x}",
+            pci_bar_address,
+            cap_offset_usize,
+            pci_bar_address + cap_offset_usize
+        );
         // XhciController {
         //     controller: Some(unsafe {
         //         xhci::Registers::new(
