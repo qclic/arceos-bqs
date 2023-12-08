@@ -49,15 +49,15 @@ impl Mapper for MemoryMapper {
         info!("mapping:{:x}", phys_base);
 
         // return NonZeroUsize::new_unchecked(phys_base + self.addr_offset);
-        // return NonZeroUsize::new_unchecked(phys_to_virt(phys_base.into()).as_usize());
-        let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base >> 1 << 1));
+        return NonZeroUsize::new_unchecked(phys_to_virt(phys_base.into()).as_usize());
+        // let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base >> 1 << 1));
 
         // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
         // return NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
 
-        let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
-        info!("return:{:x},byte:{:x}", ret, bytes);
-        return ret;
+        // let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
+        // info!("return:{:x},byte:{:x}", ret, bytes);
+        // return ret;
     }
 
     fn unmap(&mut self, virt_base: usize, bytes: usize) {}
@@ -87,19 +87,19 @@ impl XhciController {
             cap_offset_usize,
             pci_bar_address + cap_offset_usize
         );
-        // XhciController {
-        //     controller: Some(unsafe {
-        //         xhci::Registers::new(
-        //             pci_bar_address + cap_offset_usize,
-        //             MemoryMapper {
-        //                 // addr_offset: cap_offset_usize,
-        //             },
-        //         )
-        //     }),
-        // }
+        XhciController {
+            controller: Some(unsafe {
+                xhci::Registers::new(
+                    pci_bar_address,
+                    MemoryMapper {
+                        // addr_offset: cap_offset_usize,
+                    },
+                )
+            }),
+        }
 
         // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
-        XhciController { controller: None }
+        // XhciController { controller: None }
     }
 }
 

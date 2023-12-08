@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 use core::alloc::GlobalAlloc;
+use core::time::Duration;
 
 use crate::AxDeviceEnum;
 use axalloc::global_allocator;
@@ -102,7 +103,16 @@ cfg_if::cfg_if! {
                             const PCI_COMMAND_PARITY:u16 = 0x40;
                             //info!("{}",bar_info);
                             //TODO 问题解决方案可能在这里，记得研究一下
-                            unsafe {root.set_command(bdf, Command::MEMORY_SPACE|Command::BUS_MASTER|Command::SERR_ENABLE|Command::from_bits_unchecked(PCI_COMMAND_PARITY));}
+                            unsafe {
+                                // info!("{:b}",root.get_status_command(bdf).0);
+                                root.set_command(bdf, Command::SERR_ENABLE|Command::IO_SPACE|Command::MEMORY_SPACE|Command::INTERRUPT_DISABLE);
+                                // info!("enabled");
+                                // loop {
+                                //     axhal::time::busy_wait(Duration::from_micros(20));
+
+                                //     info!("{:b}",root.get_status_command(bdf).0)
+                                // }
+                            }
                             match bar_info {
                             driver_pci::BarInfo::Memory{address,size, ..}=>{
                             info!("enabling!");
@@ -139,8 +149,24 @@ cfg_if::cfg_if! {
                                             )
                                         )
                                 );
-                                // return  None;
                                 // return Some(AxDeviceEnum::XHCI(XhciController{}))
+                                },
+                                driver_pci::BarInfo::IO { address, size }=>{
+                                    return Some(
+                                        AxDeviceEnum::XHCI(
+                                            XhciController::init(
+                                                // phys_to_virt(entry.paddr()).into()
+                                                // mmio as usize
+                                                // phys_to_virt((0x600000000 as usize).into()).as_usize()
+                                                // phys_to_virt((0x10_0000 as usize).into()).as_usize()
+                                                // 0x600000000 as usize
+                                                address as usize,
+                                                size as usize,
+                                                cap_offset as usize
+                                            )
+                                        )
+                                );
+
                                 }
                                 _=>return None
                             // return Some(AxDeviceEnum::from_xhci(dev))
