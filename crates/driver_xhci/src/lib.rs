@@ -87,7 +87,8 @@ impl XhciController {
             cap_offset_usize,
             pci_bar_address + cap_offset_usize
         );
-        XhciController {
+
+        let xhci_controller = XhciController {
             controller: Some(unsafe {
                 xhci::Registers::new(
                     pci_bar_address,
@@ -96,10 +97,14 @@ impl XhciController {
                     },
                 )
             }),
+        };
+
+        match xhci_controller.controller {
+            Some(op) => {}
+            None => {}
         }
 
-        // controller: unsafe { xhci::Registers::new(0xfd500000, MemoryMapper {}) },
-        // XhciController { controller: None }
+        xhci_controller
     }
 }
 

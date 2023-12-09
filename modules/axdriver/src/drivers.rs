@@ -117,7 +117,7 @@ cfg_if::cfg_if! {
                             driver_pci::BarInfo::Memory{address,size, ..}=>{
                             info!("enabling!");
 
-                            // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
+                            let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);
                             // // let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  phys_to_virt((0x10_0000 as usize).into()));
                             // loop {
 

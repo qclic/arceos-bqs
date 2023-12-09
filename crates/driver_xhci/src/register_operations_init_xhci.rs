@@ -23,7 +23,7 @@ const PCI_CAP_ID_EXP: u8 = 0x10;
 const PCI_EXP_RTCTL: u64 = 28;
 const PCI_EXP_RTCTL_CRSSVE: u8 = 0x0010;
 const ARM_XHCI_BASE: usize = 0xFA00_0000;
-const MAPPED_XHCI_BASE: usize = 0xffff_0000_fA00_0000;
+const MAPPED_XHCI_BASE: usize = 0x600000000;
 const XHCI_REG_CAP_HCIVERSION: usize = 0x02;
 const XHCI_PCI_CLASS_CODE: usize = 0xC0330;
 const XHCI_PCIE_SLOT: usize = 0;
@@ -53,7 +53,10 @@ pub fn enable_xhci(bus: u8, dfn: u8, address: usize) -> usize {
         panic!("state sync fail!");
     }
     //check version
-    let usVersion: u16 = unsafe { *((MAPPED_XHCI_BASE + XHCI_REG_CAP_HCIVERSION) as *const u16) };
+    let usVersion: u16 = unsafe {
+        *((phys_to_virt(MAPPED_XHCI_BASE.into()).as_usize() + XHCI_REG_CAP_HCIVERSION)
+            as *const u16)
+    };
     if usVersion != 0x100 {
         info!("Unsupported xHCI version {:x}", usVersion);
     }
@@ -93,8 +96,8 @@ fn enable_device(address: usize) {
     unsafe {
         *((conf + PCI_CACHE_LINE_SIZE) as *mut u8) = 64 / 4; // TODO: get this from cache config
 
-        *((conf + 0x10) as *mut u32) = (MEM_PCIE_RANGE_PCIE_START) as u32 | 0x04;
-        *((conf + 0x14) as *mut u32) = (MEM_PCIE_RANGE_PCIE_START >> 32) as u32;
+        // *((conf + 0x10) as *mut u32) = (MEM_PCIE_RANGE_PCIE_START) as u32 | 0x04;
+        // *((conf + 0x14) as *mut u32) = (MEM_PCIE_RANGE_PCIE_START >> 32) as u32;
         *((conf + 0x04) as *mut u16) = 0x2 | 0x4 | 0x40 | 0x100;
     }
 }

@@ -1,5 +1,6 @@
 use axhal::mem::PhysAddr;
 use core::f32::consts::E;
+use driver_xhci::XhciController;
 use std::io::{self};
 
 #[cfg(all(not(feature = "axstd"), unix))]
@@ -447,7 +448,11 @@ fn do_m0ve(args: &str) {
 }
 
 fn test_usb_driver(str: &str) {
-    axdriver::init_drivers();
+    let init_drivers = axdriver::init_drivers();
+    // match init_drivers.xhci {
+    // Some(XhciController) => todo!(),
+    // None => todo!(),
+    // }
 }
 
 fn enable_pci(str: &str) {
