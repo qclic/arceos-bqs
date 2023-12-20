@@ -21,11 +21,12 @@ use log::info;
 use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 use xhci::{
     accessor::Mapper,
-    extended_capabilities::xhci_supported_protocol,
+    extended_capabilities::{self, xhci_extended_message_interrupt, xhci_supported_protocol},
     registers::{
         operational::{DeviceContextBaseAddressArrayPointerRegister, UsbStatusRegister},
         Operational,
     },
+    ring::trb,
     Registers,
 };
 
@@ -45,33 +46,12 @@ pub mod register_operations_init_xhci;
 pub struct XhciInfo {}
 
 #[derive(Clone)]
-struct MemoryMapper {
-    // addr_offset: usize,
-}
+struct MemoryMapper;
 
 impl Mapper for MemoryMapper {
     unsafe fn map(&mut self, phys_base: usize, bytes: usize) -> NonZeroUsize {
-        // let virt_to_phys = virt_to_phys(phys_base.into());
-        // let from = A64PTE(phys_base);
-
-        // info!("mapping");
-        // let pte: A64PTE =
-        //     page_table::GenericPTE::new_page(virt_to_phys, MappingFlags::DEVICE, false);
-        // // A64PTE::
-        // info!("mapped");
-        // let phys_to_virt = page_table::PagingIf::phys_to_virt(PhysAddr::from(phys_base));
         info!("mapping:{:x}", phys_base);
-
-        // return NonZeroUsize::new_unchecked(phys_base + self.addr_offset);
         return NonZeroUsize::new_unchecked(phys_to_virt(phys_base.into()).as_usize());
-        // let phys_to_virt = phys_to_virt(PhysAddr::from(phys_base >> 1 << 1));
-
-        // return NonZeroUsize::new_unchecked(phys_to_virt(from).as_usize());
-        // return NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
-
-        // let ret = NonZeroUsize::new_unchecked(phys_to_virt.as_usize());
-        // info!("return:{:x},byte:{:x}", ret, bytes);
-        // return ret;
     }
 
     fn unmap(&mut self, virt_base: usize, bytes: usize) {}
@@ -113,191 +93,179 @@ impl XhciController {
             }),
         };
 
-        xhci_controller.init_xhci();
-        xhci_controller.enable_usbs();
+        xhci_controller.startup();
+        xhci_controller.enable_interrupt();
+        xhci_controller.register_interrupt_handler();
+        xhci_controller.enable_ports();
 
         xhci_controller
     }
 
-    pub fn init_xhci(&mut self) -> Result<(), ()> {
-        // 获取操作寄存器
-        //TODO 修好这玩意
-        let operational = &mut self.operational;
-        // 获取运行时寄存器
-        let runtime = &mut self.runtime;
-        // 获取中断器寄存器集
-        let interrupter = &mut runtime.interrupter[0];
-        // 获取能力寄存器
-        let capability = &self.capability;
-        // 获取门铃寄存器
-        let doorbell = &mut self.doorbell;
+    // 初始化控制器
+    fn startup(&mut self) {
+        let mut r = self.controller.as_mut().unwrap();
 
-        // 为xhci控制器分配内存空间
-        let memory = MemoryManager::new(device, capability)?;
+        // 获取操作寄存器的引用
+        let o = &mut r.operational;
 
-        // 将内存空间的物理地址写入寄存器
-        // operational.dcbaap.write(memory.dcbaa_phys_addr());
-        // operational.crcr.write(memory.command_ring_phys_addr());
+        // 清除状态位和中断使能位
+        // o.usbsts.write(0xFFFFFFFF);
+        o.usbsts.update_volatile(|r| {
+            r.clear_event_interrupt();
+            r.clear_host_system_error();
+            r.clear_port_change_detect();
+            r.clear_save_restore_error();
+        });
+        o.usbcmd.update(|u| u.clear_interrupter_enable());
 
-        // 创建事件环和命令环
-        let mut event_ring = EventRing::new(memory.event_ring_buffer(), interrupter);
-        let mut command_ring = CommandRing::new(memory.command_ring_buffer(), doorbell);
+        // // 为控制器分配设备上下文数组
+        let dcbaap = unsafe {
+            axalloc::global_allocator().alloc(Layout::from_size_align(256 * 8, 1024)) as *mut u64
+        };
+        o.dcbaap.write_volatile(dcbaap as u64);
 
-        // 创建设备上下文数组
-        let device_context_array = DeviceContextArray::new(memory.device_context_array_buffer());
+        // // 为控制器分配事件环
+        let erst = unsafe {
+            axalloc::global_allocator().alloc(Layout::from_size_align(16 * 8, 1024)) as *mut u64
+        };
 
-        // 创建端点上下文数组
-        let endpoint_context_array =
-            EndpointContextArray::new(memory.endpoint_context_array_buffer());
+        let interrupter_mut = r.interrupter_register_set.interrupter_mut(0);
+        interrupter_mut.erstsz.write(1);
+        interrupter_mut.erstba.write(erst as u64);
 
-        // 启用中断
-        interrupter.iman.update(|u| u.set_interrupt_enable());
-        interrupter
-            .erstba
-            .write(memory.event_ring_segment_table_phys_addr());
-        interrupter
-            .erdp
-            .write(memory.event_ring_dequeue_phys_addr());
+        // // 将事件环的消费者循环索引写入操作寄存器
+        interrupter_mut.erdp.write(erst as u64);
 
-        // 启用槽和端口
-        operational.config.write(capability.max_slots());
-        operational.usbcmd.update(|u| u.set_enable_slot());
+        // 将控制器的运行/停止位置为1，以启动控制器
+        o.usbcmd.update(|u| u.set_run_stop());
+        while o.usbsts.read().hc_halted() {}
 
-        // 获取槽号
-        let slot_id = command_ring.enable_slot(&mut event_ring)?;
-
-        // 获取槽上下文
-        let slot_context = device_context_array.get_slot_context(slot_id);
-
-        // 将槽上下文的物理地址写入寄存器
-        command_ring.address_device(slot_id, slot_context.phys_addr(), &mut event_ring)?;
-
-        // 返回成功
-        Ok(())
+        info!(
+            "status:not_ready-{}",
+            o.usbsts.read_volatile().controller_not_ready()
+        );
     }
 
-    fn enable_usbs(&self) {
+    // 启用中断
+    fn enable_interrupt(&mut self) {
+        // 获取寄存器组的引用
+        let r = self.controller.as_mut().unwrap();
+
+        // 获取中断管理寄存器和中断调节寄存器
+        let iman = &mut r.interrupter_register_set.interrupter_mut(0).iman;
+        let imod = &mut r.interrupter_register_set.interrupter_mut(0).imod;
+
+        // 启用中断并设置中断间隔为4000微秒和中断计数器为0
+        iman.update_volatile(|i| i.set_interrupt_enable());
+        imod.write_volatile(InterrupterRegisterSet::new(4000, 0));
+
+        // 获取USB中断使能寄存器
+        // let unk = &mut r.interrupter_register_set.interrupter_mut(0).imod;
+
+        //需要使用trb
+        r.interrupter_register_set
+            .interrupter_mut(0)
+            .iman
+            // 选择端口状态改变事件和传输完成事件作为中断源
+            .update_volatile(|u| {
+                u.set_port_status_change_event_enable();
+                u.set_transfer_event_enable();
+            });
+
+        // 获取MSI-X表的地址
+        let msix_table_address = 0xfee00000;
+
+        // 获取MSI-X表的指针
+        let msix_table_ptr = unsafe { (msix_table_address as *mut u32).as_mut().unwrap() };
+
+        // 设置中断向量的地址为0xfee00000，数据为0x00000030
+        msix_table_ptr.write_volatile(0xfee00000);
+        msix_table_ptr.add(1).write_volatile(0x00000030);
+    }
+
+    // 注册中断处理函数
+    fn register_interrupt_handler(&self) {
+        // 定义一个中断处理函数
+        extern "C" fn xhci_interrupt_handler() {
+            // 读取事件环的生产者循环索引
+            let erst = unsafe { &mut *(0x251000 as *mut u32) };
+            let producer_cycle_state = erst.read_volatile() & 1;
+
+            // 读取事件环的消费者循环索引
+            let erdp = unsafe { &mut *(0x251010 as *mut u32) };
+            let consumer_cycle_state = erdp.read_volatile() & 1;
+
+            // 如果生产者和消费者的循环状态相同，说明有新的事件
+            if producer_cycle_state == consumer_cycle_state {
+                // 读取事件环的当前事件
+                let trb = unsafe { &mut *(erdp.read_volatile() as *mut u32) };
+
+                // 根据事件的类型和参数执行相应的操作
+                match trb.read_volatile() >> 10 & 0b111111 {
+                    0b000001 => println!("Transfer Event"),
+                    0b000100 => println!("Port Status Change Event"),
+                    _ => println!("Unknown Event"),
+                }
+
+                // 更新消费者循环索引和循环状态
+                erdp.write_volatile(erdp.read_volatile() + 16);
+                erdp.update(|e| e ^ 1);
+            }
+
+            // 发送EOI（结束中断）信号
+            unsafe {
+                PICS.lock().notify_end_of_interrupt(0x30);
+            }
+        }
+
+        // 注册中断处理函数到IDT中
+        unsafe {
+            idt::set_gate(0x30, xhci_interrupt_handler as usize, 0x8E);
+        }
+
+        // 加载IDT到CPU中
+        unsafe {
+            idt::load();
+        }
+    }
+
+    // 启用端口
+    fn enable_ports(&mut self) {
+        // 获取寄存器组的引用
+        let r = self.registers.as_mut().unwrap();
+
         // 获取端口的数量
-        let port_count = self
-            .controller
-            .unwrap()
-            .capability
-            .hcsparams1
-            .read()
-            .number_of_ports();
+        let port_count = r.capability.hcsparams1.read().max_ports();
 
         // 遍历每个端口
-        for i in 1..port_count {
-            info!("enpowering {i}");
+        for i in 0..port_count {
             // 获取端口的状态和控制寄存器
-            let portsc = &mut reg.port_register_set.read_volatile_at(i as usize).portsc;
-            info!("status:{}", portsc.current_connect_status());
+            let portsc = &mut r.operational.port_register_set[i as usize].portsc;
 
             // 检查端口是否连接了设备
-            if portsc.current_connect_status() {
+            if portsc.read().current_connect_status() {
                 // 重置端口
-                portsc.set_port_reset();
-                while portsc.port_reset() {
-                    info!("waiting port reset");
-                    busy_wait(Duration::from_secs(1));
-                }
+                portsc.update(|p| p.set_port_reset());
+                while portsc.read().port_reset() {}
 
                 // 使能端口
-                portsc.set_0_port_enabled_disabled();
-                while !portsc.port_enabled_disabled() {
-                    info!("waiting port enable");
-                }
-                info!("enabled{:x}", i);
+                portsc.update(|p| p.set_port_enable());
+                while !portsc.read().port_enable() {}
 
                 // 配置端口
-                // portsc.update(|p| {
-                // 设置端口速度
-                // portsc.set_port_speed(PortSpeed::SuperSpeed);
-                // 设置端口功率
-                portsc.set_port_power();
-                // 设置端口链路状态
-                portsc.set_port_link_state(0);
-                // });
-
-                info!(
-                    "status of {i}: {},connected?{},status_change:{},speed:{}",
-                    portsc.port_link_state(),
-                    portsc.current_connect_status(),
-                    portsc.connect_status_change(),
-                    portsc.port_speed()
-                )
+                portsc.update(|p| {
+                    // 设置端口速度
+                    p.set_port_speed(PortSpeed::SuperSpeed);
+                    // 设置端口功率
+                    p.set_port_power();
+                    // 设置端口链路状态
+                    p.set_port_link_state(0);
+                });
             }
         }
     }
 }
 
-// fn set_interrupt(reg: &Registers<MemoryMapper>) {
-//     // 获取中断管理寄存器和中断调节寄存器
-//     let iman = &mut reg.runtime.interrupter_register_set[0].iman;
-//     let imod = &mut reg.runtime.interrupter_register_set[0].imod;
-
-//     // 启用中断并设置中断间隔为4000微秒和中断计数器为0
-//     iman.update(|i| i.set_interrupt_enable());
-//     imod.write(InterrupterRegisterSet::new(4000, 0));
-
-//     // 获取USB中断使能寄存器
-//     let usbintr = &mut reg.operational.usbintr;
-
-//     // 选择端口状态改变事件和传输完成事件作为中断源
-//     usbintr.update(|u| {
-//         u.set_port_status_change_event_enable();
-//         u.set_transfer_event_enable();
-//     });
-
-//     // 获取MSI-X表的地址
-//     let msix_table_address = 0xfee00000;
-
-//     // // 获取MSI-X表的指针
-//     // let msix_table_ptr = (msix_table_address as *mut u32).as_mut().unwrap();
-
-//     // // 设置中断向量的地址为0xfee00000，数据为0x00000030
-//     // msix_table_ptr.write_volatile(0xfee00000);
-//     // msix_table_ptr.add(1).write_volatile(0x00000030);
-
-//     // // 定义一个中断处理函数
-//     // extern "x86-interrupt" fn xhci_interrupt_handler(_stack_frame: &mut InterruptStackFrame) {
-//     //     // 读取事件环的生产者循环索引
-//     //     let erst = unsafe { &mut *(0x251000 as *mut u32) };
-//     //     let producer_cycle_state = erst.read_volatile() & 1;
-
-//     //     // 读取事件环的消费者循环索引
-//     //     let erdp = unsafe { &mut *(0x251010 as *mut u32) };
-//     //     let consumer_cycle_state = erdp.read_volatile() & 1;
-
-//     //     // 如果生产者和消费者的循环状态相同，说明有新的事件
-//     //     if producer_cycle_state == consumer_cycle_state {
-//     //         // 读取事件环的当前事件
-//     //         let trb = unsafe { &mut *(erdp.read_volatile() as *mut u32) };
-
-//     //         // 根据事件的类型和参数执行相应的操作
-//     //         match trb.read_volatile() >> 10 & 0b111111 {
-//     //             0b000001 => println!("Transfer Event"),
-//     //             0b000100 => println!("Port Status Change Event"),
-//     //             _ => println!("Unknown Event"),
-//     //         }
-
-//     //         // 更新消费者循环索引和循环状态
-//     //         erdp.write_volatile(erdp.read_volatile() + 16);
-//     //         erdp.update(|e| e ^ 1);
-//     //     }
-
-//     //     // 发送EOI（结束中断）信号
-//     //     unsafe {
-//     //         PICS.lock().notify_end_of_interrupt(0x30);
-//     //     }
-//     // }
-
-//     // // 注册中断处理函数到IDT中
-//     // idt[0x30].set_handler_fn(xhci_interrupt_handler);
-//     //TODO: config interrupt
-// }
-
-/// Operations that require a graphics device driver to implement.
 pub trait XhciDriverOps: BaseDriverOps {
     /// Get the display information.
     fn info(&self) -> XhciInfo;
