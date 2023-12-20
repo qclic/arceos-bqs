@@ -9,7 +9,7 @@ use core::{
     time::Duration,
 };
 
-use alloc::boxed::Box;
+use abstracted_data_struct::*;
 use axalloc::GlobalAllocator;
 use axhal::{
     mem::{phys_to_virt, virt_to_phys, PhysAddr, VirtAddr},
@@ -22,7 +22,10 @@ use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 use xhci::{
     accessor::Mapper,
     extended_capabilities::xhci_supported_protocol,
-    registers::{operational::UsbStatusRegister, Operational},
+    registers::{
+        operational::{DeviceContextBaseAddressArrayPointerRegister, UsbStatusRegister},
+        Operational,
+    },
     Registers,
 };
 
@@ -34,6 +37,7 @@ pub const VL805_VENDOR_ID: u16 = 0x1106;
 pub const VL805_DEVICE_ID: u16 = 0x3483;
 pub const VL805_MMIO_BASE: usize = 0x6_0000_0000;
 
+pub mod abstracted_data_struct;
 pub mod register_operations_init_xhci;
 
 /// The information of the graphics device.
@@ -98,7 +102,7 @@ impl XhciController {
             pci_bar_address + cap_offset_usize
         );
 
-        let xhci_controller = XhciController {
+        let mut xhci_controller = XhciController {
             controller: Some(unsafe {
                 xhci::Registers::new(
                     pci_bar_address,
@@ -109,90 +113,120 @@ impl XhciController {
             }),
         };
 
-        match &xhci_controller.controller {
-            Some(r) => {
-                // set_interrupt(r);
-                enable_usbs(r);
-            }
-            None => {}
-        }
+        xhci_controller.init_xhci();
+        xhci_controller.enable_usbs();
 
         xhci_controller
     }
-}
 
-fn enable_xhci(reg: Registers<MemoryMapper>) {
-    // 获取操作寄存器的引用
-    let o = &mut reg.operational;
+    pub fn init_xhci(&mut self) -> Result<(), ()> {
+        // 获取操作寄存器
+        //TODO 修好这玩意
+        let operational = &mut self.operational;
+        // 获取运行时寄存器
+        let runtime = &mut self.runtime;
+        // 获取中断器寄存器集
+        let interrupter = &mut runtime.interrupter[0];
+        // 获取能力寄存器
+        let capability = &self.capability;
+        // 获取门铃寄存器
+        let doorbell = &mut self.doorbell;
 
-    // 清除状态位和中断使能位
-    o.usbsts
-        .write_volatile(UsbStatusRegister(0xFFFFFFFF as u32));
-    o.usbcmd.update_volatile(|u| {
-        u.clear_interrupter_enable();
-    });
+        // 为xhci控制器分配内存空间
+        let memory = MemoryManager::new(device, capability)?;
 
-    // 为控制器分配设备上下文数组
-    let dcbaap = Box::leak(Box::new([0; 256]));
-    o.dcbaap.write(dcbaap.as_ptr() as u64);
+        // 将内存空间的物理地址写入寄存器
+        // operational.dcbaap.write(memory.dcbaa_phys_addr());
+        // operational.crcr.write(memory.command_ring_phys_addr());
 
-    // 为控制器分配事件环
-    let erst = Box::leak(Box::new([0; 16]));
-    o.erstsz.write(1); //TODO: found Event Ring Segment Table Size Register, it's in interrupt reg sets!
-    o.erstba.write(erst.as_ptr() as u64);
+        // 创建事件环和命令环
+        let mut event_ring = EventRing::new(memory.event_ring_buffer(), interrupter);
+        let mut command_ring = CommandRing::new(memory.command_ring_buffer(), doorbell);
 
-    // 将事件环的消费者循环索引写入操作寄存器
-    o.erdp.write(erst.as_ptr() as u64);
+        // 创建设备上下文数组
+        let device_context_array = DeviceContextArray::new(memory.device_context_array_buffer());
 
-    // 将控制器的运行/停止位置为1，以启动控制器
-    o.usbcmd.update_volatile(|u| {
-        u.set_run_stop();
-    });
-    while o.usbsts.read().hc_halted() {}
-}
+        // 创建端点上下文数组
+        let endpoint_context_array =
+            EndpointContextArray::new(memory.endpoint_context_array_buffer());
 
-fn enable_usbs(reg: &Registers<MemoryMapper>) {
-    // 获取端口的数量
-    let port_count = reg.capability.hcsparams1.read().number_of_ports();
+        // 启用中断
+        interrupter.iman.update(|u| u.set_interrupt_enable());
+        interrupter
+            .erstba
+            .write(memory.event_ring_segment_table_phys_addr());
+        interrupter
+            .erdp
+            .write(memory.event_ring_dequeue_phys_addr());
 
-    // 遍历每个端口
-    for i in 1..port_count {
-        info!("enpowering {i}");
-        // 获取端口的状态和控制寄存器
-        let portsc = &mut reg.port_register_set.read_volatile_at(i as usize).portsc;
-        info!("status:{}", portsc.current_connect_status());
+        // 启用槽和端口
+        operational.config.write(capability.max_slots());
+        operational.usbcmd.update(|u| u.set_enable_slot());
 
-        // 检查端口是否连接了设备
-        if portsc.current_connect_status() {
-            // 重置端口
-            portsc.set_port_reset();
-            while portsc.port_reset() {
-                info!("waiting port reset");
-                busy_wait(Duration::from_secs(1));
+        // 获取槽号
+        let slot_id = command_ring.enable_slot(&mut event_ring)?;
+
+        // 获取槽上下文
+        let slot_context = device_context_array.get_slot_context(slot_id);
+
+        // 将槽上下文的物理地址写入寄存器
+        command_ring.address_device(slot_id, slot_context.phys_addr(), &mut event_ring)?;
+
+        // 返回成功
+        Ok(())
+    }
+
+    fn enable_usbs(&self) {
+        // 获取端口的数量
+        let port_count = self
+            .controller
+            .unwrap()
+            .capability
+            .hcsparams1
+            .read()
+            .number_of_ports();
+
+        // 遍历每个端口
+        for i in 1..port_count {
+            info!("enpowering {i}");
+            // 获取端口的状态和控制寄存器
+            let portsc = &mut reg.port_register_set.read_volatile_at(i as usize).portsc;
+            info!("status:{}", portsc.current_connect_status());
+
+            // 检查端口是否连接了设备
+            if portsc.current_connect_status() {
+                // 重置端口
+                portsc.set_port_reset();
+                while portsc.port_reset() {
+                    info!("waiting port reset");
+                    busy_wait(Duration::from_secs(1));
+                }
+
+                // 使能端口
+                portsc.set_0_port_enabled_disabled();
+                while !portsc.port_enabled_disabled() {
+                    info!("waiting port enable");
+                }
+                info!("enabled{:x}", i);
+
+                // 配置端口
+                // portsc.update(|p| {
+                // 设置端口速度
+                // portsc.set_port_speed(PortSpeed::SuperSpeed);
+                // 设置端口功率
+                portsc.set_port_power();
+                // 设置端口链路状态
+                portsc.set_port_link_state(0);
+                // });
+
+                info!(
+                    "status of {i}: {},connected?{},status_change:{},speed:{}",
+                    portsc.port_link_state(),
+                    portsc.current_connect_status(),
+                    portsc.connect_status_change(),
+                    portsc.port_speed()
+                )
             }
-
-            // 使能端口
-            portsc.set_0_port_enabled_disabled();
-            while !portsc.port_enabled_disabled() {
-                info!("waiting port enable");
-            }
-            info!("enabled{:x}", i);
-
-            // 配置端口
-            // portsc.update(|p| {
-            // 设置端口速度
-            // portsc.set_port_speed(PortSpeed::SuperSpeed);
-            // 设置端口功率
-            portsc.set_port_power();
-            // 设置端口链路状态
-            portsc.set_port_link_state(0);
-            // });
-
-            info!(
-                "status of {i}: {},connected?{}",
-                portsc.port_link_state(),
-                portsc.current_connect_status(),
-            )
         }
     }
 }

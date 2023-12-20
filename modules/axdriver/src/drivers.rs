@@ -115,6 +115,7 @@ cfg_if::cfg_if! {
                             }
                             match bar_info {
                             driver_pci::BarInfo::Memory{address,size, ..}=>{
+
                             info!("enabling!");
 
                             let mmio = register_operations_init_xhci::enable_xhci(bdf.bus, bdf.function,  0xffff_0000_fd50_0000);

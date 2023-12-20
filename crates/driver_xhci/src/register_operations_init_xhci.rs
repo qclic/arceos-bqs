@@ -44,6 +44,7 @@ fn delay(seconds: u64) {
 }
 
 ///return:mmio space
+
 pub fn enable_xhci(bus: u8, dfn: u8, address: usize) -> usize {
     info!("xhci energizing!{:x}", address);
     enable_bridge(bus, dfn, address);
