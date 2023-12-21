@@ -3,7 +3,7 @@ use core::{marker::PhantomData, ptr::NonNull};
 use tock_registers::{
     interfaces::{ReadWriteable, Readable, Writeable},
     register_bitfields, register_structs,
-    registers::{ReadOnly, ReadWrite, WriteOnly},
+    registers::{ReadOnly, ReadWrite},
 };
 
 use crate::BCM2711Hal;

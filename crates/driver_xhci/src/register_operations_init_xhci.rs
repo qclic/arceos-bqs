@@ -1,8 +1,8 @@
 //these code mainly inspired by circle:https://github.com/rsta2/circle
-use core::{fmt::Display, u128};
+use core::fmt::Display;
 
-use aarch64_cpu::asm::barrier::{self, ST, SY};
-use axhal::mem::{phys_to_virt, virt_to_phys, PhysAddr};
+use aarch64_cpu::asm::barrier::{self, SY};
+use axhal::mem::{phys_to_virt, virt_to_phys};
 use core::fmt;
 use log::info;
 

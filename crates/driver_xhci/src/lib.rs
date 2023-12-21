@@ -3,35 +3,22 @@
 #![no_std]
 #![feature(strict_provenance)]
 
-use core::{
-    alloc::{GlobalAlloc, Layout},
-    num::NonZeroUsize,
-    time::Duration,
-};
+use core::{alloc::Layout, num::NonZeroUsize};
 
-use abstracted_data_struct::*;
-use axalloc::GlobalAllocator;
-use axhal::{
-    mem::{phys_to_virt, virt_to_phys, PhysAddr, VirtAddr},
-    time::busy_wait,
-};
+use axhal::mem::phys_to_virt;
 #[doc(no_inline)]
-pub use driver_common::{BaseDriverOps, DevError, DevResult, DeviceType};
+pub use driver_common::{BaseDriverOps, DeviceType};
 use log::info;
-use page_table_entry::{aarch64::A64PTE, GenericPTE, MappingFlags};
 use xhci::{
     accessor::Mapper,
-    extended_capabilities::{self, xhci_extended_message_interrupt, xhci_supported_protocol},
-    registers::{
-        operational::{DeviceContextBaseAddressArrayPointerRegister, UsbStatusRegister},
-        Operational,
-    },
-    ring::trb,
+    extended_capabilities::{self},
     Registers,
 };
 
 pub struct XhciController {
     pub controller: Option<Registers<MemoryMapper>>,
+    extended_cap: Option<extended_capabilities::List<MemoryMapper>>,
+    mapper: Option<MemoryMapper>,
 }
 
 pub const VL805_VENDOR_ID: u16 = 0x1106;
@@ -45,7 +32,7 @@ pub mod register_operations_init_xhci;
 #[derive(Debug, Clone, Copy)]
 pub struct XhciInfo {}
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct MemoryMapper;
 
 impl Mapper for MemoryMapper {
@@ -82,20 +69,23 @@ impl XhciController {
             pci_bar_address + cap_offset_usize
         );
 
+        let memory_mapper = MemoryMapper {};
+        let register = unsafe { xhci::Registers::new(pci_bar_address, memory_mapper) };
+        let read_volatile = register.capability.hccparams1.read_volatile();
+
+        let extended_cap = unsafe {
+            extended_capabilities::List::new(pci_bar_address, read_volatile, MemoryMapper)
+        };
+
         let mut xhci_controller = XhciController {
-            controller: Some(unsafe {
-                xhci::Registers::new(
-                    pci_bar_address,
-                    MemoryMapper {
-                        // addr_offset: cap_offset_usize,
-                    },
-                )
-            }),
+            mapper: Some(memory_mapper),
+            controller: Some(register),
+            extended_cap,
         };
 
         xhci_controller.startup();
         xhci_controller.enable_interrupt();
-        xhci_controller.register_interrupt_handler();
+        // xhci_controller.register_interrupt_handler();
         xhci_controller.enable_ports();
 
         xhci_controller
@@ -116,29 +106,45 @@ impl XhciController {
             r.clear_port_change_detect();
             r.clear_save_restore_error();
         });
-        o.usbcmd.update(|u| u.clear_interrupter_enable());
+        o.usbcmd.update_volatile(|u| {
+            u.clear_interrupter_enable();
+        });
 
-        // // 为控制器分配设备上下文数组
+        // 为控制器分配设备上下文数组
         let dcbaap = unsafe {
-            axalloc::global_allocator().alloc(Layout::from_size_align(256 * 8, 1024)) as *mut u64
+            axalloc::global_allocator()
+                .alloc(Layout::from_size_align_unchecked(256 * 8, 1024))
+                .unwrap()
+                .addr()
+                .get() as u64
         };
-        o.dcbaap.write_volatile(dcbaap as u64);
+        o.dcbaap.update_volatile(|r| r.set(dcbaap as u64));
 
         // // 为控制器分配事件环
         let erst = unsafe {
-            axalloc::global_allocator().alloc(Layout::from_size_align(16 * 8, 1024)) as *mut u64
+            axalloc::global_allocator()
+                .alloc(Layout::from_size_align_unchecked(16 * 8, 1024))
+                .unwrap()
+                .addr()
+                .get() as u64
         };
 
-        let interrupter_mut = r.interrupter_register_set.interrupter_mut(0);
-        interrupter_mut.erstsz.write(1);
-        interrupter_mut.erstba.write(erst as u64);
+        let mut interrupter_mut = r.interrupter_register_set.interrupter_mut(0);
+        interrupter_mut.erstsz.update_volatile(|r| r.0 = 1);
+        interrupter_mut
+            .erstba
+            .update_volatile(|r| r.set(erst as u64));
 
         // // 将事件环的消费者循环索引写入操作寄存器
-        interrupter_mut.erdp.write(erst as u64);
+        interrupter_mut
+            .erdp
+            .update_volatile(|r| r.set_event_ring_dequeue_pointer(erst as u64));
 
         // 将控制器的运行/停止位置为1，以启动控制器
-        o.usbcmd.update(|u| u.set_run_stop());
-        while o.usbsts.read().hc_halted() {}
+        o.usbcmd.update_volatile(|r| {
+            r.set_run_stop();
+        });
+        while o.usbsts.read_volatile().hc_halted() {}
 
         info!(
             "status:not_ready-{}",
@@ -156,21 +162,29 @@ impl XhciController {
         let imod = &mut r.interrupter_register_set.interrupter_mut(0).imod;
 
         // 启用中断并设置中断间隔为4000微秒和中断计数器为0
-        iman.update_volatile(|i| i.set_interrupt_enable());
-        imod.write_volatile(InterrupterRegisterSet::new(4000, 0));
+        iman.update_volatile(|i| {
+            i.set_interrupt_enable();
+        });
+        imod.update_volatile(|r| {
+            r.set_interrupt_moderation_interval(4000);
+            r.set_interrupt_moderation_counter(0);
+        });
 
-        // 获取USB中断使能寄存器
-        // let unk = &mut r.interrupter_register_set.interrupter_mut(0).imod;
-
-        //需要使用trb
-        r.interrupter_register_set
-            .interrupter_mut(0)
-            .iman
-            // 选择端口状态改变事件和传输完成事件作为中断源
-            .update_volatile(|u| {
-                u.set_port_status_change_event_enable();
-                u.set_transfer_event_enable();
-            });
+        let ext = self.extended_cap.as_mut().unwrap();
+        let iter_mut = ext.into_iter();
+        for ele in iter_mut {
+            if let Ok(cap) = ele {
+                //TODO 这玩意怎么用？
+            }
+        }
+        // .interrupter_register_set
+        // .interrupter_mut(0)
+        // .iman
+        // // 选择端口状态改变事件和传输完成事件作为中断源
+        // .update_volatile(|u| {
+        //     u.set_port_status_change_event_enable();
+        //     u.set_transfer_event_enable();
+        // });
 
         // 获取MSI-X表的地址
         let msix_table_address = 0xfee00000;
@@ -178,56 +192,58 @@ impl XhciController {
         // 获取MSI-X表的指针
         let msix_table_ptr = unsafe { (msix_table_address as *mut u32).as_mut().unwrap() };
 
-        // 设置中断向量的地址为0xfee00000，数据为0x00000030
-        msix_table_ptr.write_volatile(0xfee00000);
-        msix_table_ptr.add(1).write_volatile(0x00000030);
+        unsafe {
+            // 设置中断向量的地址为0xfee00000，数据为0x00000030
+            *msix_table_ptr = 0xfee00000;
+            *(msix_table_ptr + 1) = 0x00000030;
+        }
     }
 
-    // 注册中断处理函数
-    fn register_interrupt_handler(&self) {
-        // 定义一个中断处理函数
-        extern "C" fn xhci_interrupt_handler() {
-            // 读取事件环的生产者循环索引
-            let erst = unsafe { &mut *(0x251000 as *mut u32) };
-            let producer_cycle_state = erst.read_volatile() & 1;
+    // // 注册中断处理函数
+    // fn register_interrupt_handler(&self) {
+    //     // 定义一个中断处理函数
+    //     extern "C" fn xhci_interrupt_handler() {
+    //         // 读取事件环的生产者循环索引
+    //         let erst = unsafe { &mut *(0x251000 as *mut u32) };
+    //         let producer_cycle_state = erst.read_volatile() & 1;
 
-            // 读取事件环的消费者循环索引
-            let erdp = unsafe { &mut *(0x251010 as *mut u32) };
-            let consumer_cycle_state = erdp.read_volatile() & 1;
+    //         // 读取事件环的消费者循环索引
+    //         let erdp = unsafe { &mut *(0x251010 as *mut u32) };
+    //         let consumer_cycle_state = erdp.read_volatile() & 1;
 
-            // 如果生产者和消费者的循环状态相同，说明有新的事件
-            if producer_cycle_state == consumer_cycle_state {
-                // 读取事件环的当前事件
-                let trb = unsafe { &mut *(erdp.read_volatile() as *mut u32) };
+    //         // 如果生产者和消费者的循环状态相同，说明有新的事件
+    //         if producer_cycle_state == consumer_cycle_state {
+    //             // 读取事件环的当前事件
+    //             let trb = unsafe { &mut *(erdp.read_volatile() as *mut u32) };
 
-                // 根据事件的类型和参数执行相应的操作
-                match trb.read_volatile() >> 10 & 0b111111 {
-                    0b000001 => println!("Transfer Event"),
-                    0b000100 => println!("Port Status Change Event"),
-                    _ => println!("Unknown Event"),
-                }
+    //             // 根据事件的类型和参数执行相应的操作
+    //             match trb.read_volatile() >> 10 & 0b111111 {
+    //                 0b000001 => info!("Transfer Event"),
+    //                 0b000100 => info!("Port Status Change Event"),
+    //                 _ => info!("Unknown Event"),
+    //             }
 
-                // 更新消费者循环索引和循环状态
-                erdp.write_volatile(erdp.read_volatile() + 16);
-                erdp.update(|e| e ^ 1);
-            }
+    //             // 更新消费者循环索引和循环状态
+    //             erdp.write_volatile(erdp.read_volatile() + 16);
+    //             erdp.update(|e| e ^ 1);
+    //         }
 
-            // 发送EOI（结束中断）信号
-            unsafe {
-                PICS.lock().notify_end_of_interrupt(0x30);
-            }
-        }
+    //         // 发送EOI（结束中断）信号
+    //         unsafe {
+    //             PICS.lock().notify_end_of_interrupt(0x30);
+    //         }
+    //     }
 
-        // 注册中断处理函数到IDT中
-        unsafe {
-            idt::set_gate(0x30, xhci_interrupt_handler as usize, 0x8E);
-        }
+    //     // 注册中断处理函数到IDT中
+    //     unsafe {
+    //         idt::set_gate(0x30, xhci_interrupt_handler as usize, 0x8E);
+    //     }
 
-        // 加载IDT到CPU中
-        unsafe {
-            idt::load();
-        }
-    }
+    //     // 加载IDT到CPU中
+    //     unsafe {
+    //         idt::load();
+    //     }
+    // }
 
     // 启用端口
     fn enable_ports(&mut self) {

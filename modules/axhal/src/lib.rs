@@ -23,7 +23,6 @@
 //!
 //! [ArceOS]: https://github.com/rcore-os/arceos
 //! [cargo test]: https://doc.rust-lang.org/cargo/guide/tests.html
-
 #![no_std]
 #![feature(asm_const)]
 #![feature(naked_functions)]
@@ -42,8 +41,6 @@ pub mod cpu;
 pub mod mem;
 pub mod time;
 pub mod trap;
-
-pub static mut flag: bool = false;
 
 #[cfg(feature = "tls")]
 pub mod tls;

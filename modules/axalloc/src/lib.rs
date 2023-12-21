@@ -16,7 +16,6 @@ mod page;
 use allocator::{AllocResult, BaseAllocator, BitmapPageAllocator, ByteAllocator, PageAllocator};
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::NonNull;
-use memory_addr::{PhysAddr, VirtAddr};
 use spinlock::SpinNoIrq;
 
 const PAGE_SIZE: usize = 0x1000;

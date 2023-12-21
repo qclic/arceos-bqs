@@ -15,7 +15,6 @@ static mut BOOT_PT_L0: [A64PTE; 512] = [A64PTE::empty(); 512];
 static mut BOOT_PT_L1: [A64PTE; 512] = [A64PTE::empty(); 512];
 
 unsafe fn switch_to_el1() {
-    crate::flag = true;
     SPSel.write(SPSel::SP::ELx);
     SP_EL0.set(0);
     let current_el = CurrentEL.read(CurrentEL::EL);

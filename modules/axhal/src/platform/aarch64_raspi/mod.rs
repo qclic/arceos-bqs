@@ -54,10 +54,6 @@ pub(crate) unsafe extern "C" fn rust_entry_secondary(cpu_id: usize) {
 ///
 /// For example, the interrupt controller and the timer.
 pub fn platform_init() {
-    info!("testtesttest");
-    unsafe {
-        crate::flag = true;
-    }
     #[cfg(feature = "irq")]
     super::aarch64_common::gic::init_primary();
     super::aarch64_common::generic_timer::init_percpu();
