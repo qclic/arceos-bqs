@@ -5,6 +5,7 @@
 
 use core::{alloc::Layout, num::NonZeroUsize};
 
+use abstracted_data_struct::CommandRing;
 use axhal::mem::phys_to_virt;
 #[doc(no_inline)]
 pub use driver_common::{BaseDriverOps, DeviceType};
@@ -12,7 +13,8 @@ use log::info;
 use xhci::{
     accessor::Mapper,
     extended_capabilities::{self},
-    Registers,
+    ring::trb::event,
+    ExtendedCapability, Registers,
 };
 
 pub struct XhciController {
@@ -155,11 +157,12 @@ impl XhciController {
     // 启用中断
     fn enable_interrupt(&mut self) {
         // 获取寄存器组的引用
-        let r = self.controller.as_mut().unwrap();
+        let registers = self.controller.as_mut().unwrap();
+        let mut operational = registers.operational;
 
         // 获取中断管理寄存器和中断调节寄存器
-        let iman = &mut r.interrupter_register_set.interrupter_mut(0).iman;
-        let imod = &mut r.interrupter_register_set.interrupter_mut(0).imod;
+        let iman = &mut registers.interrupter_register_set.interrupter_mut(0).iman;
+        let imod = &mut registers.interrupter_register_set.interrupter_mut(0).imod;
 
         // 启用中断并设置中断间隔为4000微秒和中断计数器为0
         iman.update_volatile(|i| {
@@ -170,13 +173,48 @@ impl XhciController {
             r.set_interrupt_moderation_counter(0);
         });
 
+        //启用扩展功能
         let ext = self.extended_cap.as_mut().unwrap();
         let iter_mut = ext.into_iter();
-        for ele in iter_mut {
-            if let Ok(cap) = ele {
-                //TODO 这玩意怎么用？
+        for c in iter_mut.filter_map(Result::ok) {
+            if let ExtendedCapability::UsbLegacySupport(mut u) = c {
+                let l = &mut u.usblegsup;
+                l.update_volatile(|s| {
+                    s.set_hc_os_owned_semaphore();
+                });
+
+                while l.read_volatile().hc_bios_owned_semaphore()
+                    || !l.read_volatile().hc_os_owned_semaphore()
+                {}
             }
         }
+
+        let command_ring = CommandRing::new(
+            registers
+                .interrupter_register_set
+                .interrupter(0)
+                .erstba
+                .read_volatile()
+                .get(),
+        );
+        operational
+            .crcr
+            .update_volatile(|r| r.set_command_ring_pointer(command_ring.address() as u64));
+
+        xhci::ring::trb::event::TransferEvent::new();
+        // 创建一个使能中断的命令TRB
+        let enable_interrupt_trb = command_ring.create_command_trb(|t| {
+            // 设置命令类型为使能中断
+            t.set_type(CommandType::EnableInterrupt);
+            // 设置中断目标为0
+            t.set_interrupt_target(0);
+            // 设置循环位为1
+            t.set_cycle_bit();
+        });
+
+        // 将命令TRB加入命令环
+        command_ring.push_command_trb(enable_interrupt_trb);
+
         // .interrupter_register_set
         // .interrupter_mut(0)
         // .iman
@@ -186,17 +224,17 @@ impl XhciController {
         //     u.set_transfer_event_enable();
         // });
 
-        // 获取MSI-X表的地址
-        let msix_table_address = 0xfee00000;
+        // // 获取MSI-X表的地址-pcie的部分-待查询
+        // let msix_table_address = 0xfee00000;
 
-        // 获取MSI-X表的指针
-        let msix_table_ptr = unsafe { (msix_table_address as *mut u32).as_mut().unwrap() };
+        // // 获取MSI-X表的指针
+        // let msix_table_ptr = unsafe { (msix_table_address as *mut u32).as_mut().unwrap() };
 
-        unsafe {
-            // 设置中断向量的地址为0xfee00000，数据为0x00000030
-            *msix_table_ptr = 0xfee00000;
-            *(msix_table_ptr + 1) = 0x00000030;
-        }
+        // unsafe {
+        //     // 设置中断向量的地址为0xfee00000，数据为0x00000030
+        //     *msix_table_ptr = 0xfee00000;
+        //     *(msix_table_ptr + 1) = 0x00000030;
+        // }
     }
 
     // // 注册中断处理函数
