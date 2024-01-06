@@ -39,7 +39,7 @@ impl CommandRing {
     // 创建一个命令TRB
     pub fn create_command_trb<F>(&mut self, f: F) -> *mut u64
     where
-        F: fnOnce(&mut CommandTrb),
+        F: FnOnce(&mut CommandTrb),
     {
         // 获取命令环的当前位置
         let current_ptr = unsafe { self.ring_ptr.add(self.cycle_state as usize) };

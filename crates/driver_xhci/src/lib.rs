@@ -21,6 +21,7 @@ pub struct XhciController {
     pub controller: Option<Registers<MemoryMapper>>,
     extended_cap: Option<extended_capabilities::List<MemoryMapper>>,
     mapper: Option<MemoryMapper>,
+    base_addr: usize,
 }
 
 pub const VL805_VENDOR_ID: u16 = 0x1106;
@@ -28,6 +29,7 @@ pub const VL805_DEVICE_ID: u16 = 0x3483;
 pub const VL805_MMIO_BASE: usize = 0x6_0000_0000;
 
 pub mod abstracted_data_struct;
+use crate::abstracted_data_struct::CommandType;
 pub mod register_operations_init_xhci;
 
 /// The information of the graphics device.
@@ -80,13 +82,14 @@ impl XhciController {
         };
 
         let mut xhci_controller = XhciController {
+            base_addr: pci_bar_address,
             mapper: Some(memory_mapper),
             controller: Some(register),
             extended_cap,
         };
 
         xhci_controller.startup();
-        // xhci_controller.enable_interrupt();
+        xhci_controller.enable_interrupt();
         // xhci_controller.register_interrupt_handler();
         xhci_controller.enable_ports();
 
@@ -101,7 +104,6 @@ impl XhciController {
         let o = &mut r.operational;
 
         // 清除状态位和中断使能位
-        // o.usbsts.write(0xFFFFFFFF);
         o.usbsts.update_volatile(|r| {
             r.clear_event_interrupt();
             r.clear_host_system_error();
@@ -152,13 +154,15 @@ impl XhciController {
             "status:not_ready-{}",
             o.usbsts.read_volatile().controller_not_ready()
         );
+        info!("startup completed");
     }
 
     // 启用中断
     fn enable_interrupt(&mut self) {
+        info!("enable interrupting");
         // 获取寄存器组的引用
         let registers = self.controller.as_mut().unwrap();
-        let mut operational = registers.operational;
+        let mut operational = &mut registers.operational;
 
         // 获取中断管理寄存器和中断调节寄存器
         let iman = &mut registers.interrupter_register_set.interrupter_mut(0).iman;
@@ -189,13 +193,13 @@ impl XhciController {
             }
         }
 
-        let command_ring = CommandRing::new(
+        let mut command_ring = CommandRing::new(
             registers
                 .interrupter_register_set
                 .interrupter(0)
                 .erstba
                 .read_volatile()
-                .get(),
+                .get() as *mut u64,
         );
         operational
             .crcr
@@ -209,7 +213,7 @@ impl XhciController {
             // 设置中断目标为0
             t.set_interrupt_target(0);
             // 设置循环位为1
-            t.set_cycle_bit();
+            t.set_cycle_bit(1);
         });
 
         // 将命令TRB加入命令环
@@ -224,11 +228,14 @@ impl XhciController {
         //     u.set_transfer_event_enable();
         // });
 
-        // // 获取MSI-X表的地址-pcie的部分-待查询
-        // let msix_table_address = 0xfee00000;
+        info!("get msi addr");
+        let msix_table_address =
+            unsafe { self.mapper.unwrap().map(self.base_addr + 0x92, 2) }.get();
 
         // // 获取MSI-X表的指针
-        // let msix_table_ptr = unsafe { (msix_table_address as *mut u32).as_mut().unwrap() };
+        let msix_table_ptr = unsafe { (msix_table_address as *mut u64).as_mut().unwrap() };
+
+        info!("msix_table:{:x}", *msix_table_ptr);
 
         // unsafe {
         //     // 设置中断向量的地址为0xfee00000，数据为0x00000030
@@ -303,25 +310,24 @@ impl XhciController {
                 portrs.portsc.port_power()
             );
 
+            let mut portsc = portrs.portsc;
             // 检查端口是否连接了设备
-            if portsc.read().current_connect_status() {
+            if portsc.current_connect_status() {
                 // 重置端口
-                portsc.update(|p| p.set_port_reset());
-                while portsc.read().port_reset() {}
+                portsc.set_port_reset();
+                while portsc.port_reset() {}
 
                 // 使能端口
-                portsc.update(|p| p.set_port_enable());
-                while !portsc.read().port_enable() {}
+                portsc.set_0_port_enabled_disabled_change(); //核查一下是不是这个寄存器
+                while !portsc.port_enabled_disabled() {}
 
                 // 配置端口
-                portsc.update(|p| {
-                    // 设置端口速度
-                    p.set_port_speed(PortSpeed::SuperSpeed);
-                    // 设置端口功率
-                    p.set_port_power();
-                    // 设置端口链路状态
-                    p.set_port_link_state(0);
-                });
+                // 设置端口速度
+                // p.set_port_speed(PortSpeed::SuperSpeed);
+                // 设置端口功率
+                portsc.set_port_power();
+                // 设置端口链路状态
+                portsc.set_port_link_state(0);
             }
         }
     }
