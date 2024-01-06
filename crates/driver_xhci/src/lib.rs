@@ -86,7 +86,7 @@ impl XhciController {
         };
 
         xhci_controller.startup();
-        xhci_controller.enable_interrupt();
+        // xhci_controller.enable_interrupt();
         // xhci_controller.register_interrupt_handler();
         xhci_controller.enable_ports();
 
@@ -286,15 +286,22 @@ impl XhciController {
     // 启用端口
     fn enable_ports(&mut self) {
         // 获取寄存器组的引用
-        let r = self.registers.as_mut().unwrap();
+        let r = self.controller.as_mut().unwrap();
 
         // 获取端口的数量
-        let port_count = r.capability.hcsparams1.read().max_ports();
+        let port_count = r.capability.hcsparams1.read().number_of_ports();
 
         // 遍历每个端口
-        for i in 0..port_count {
+        for i in 1..port_count {
             // 获取端口的状态和控制寄存器
-            let portsc = &mut r.operational.port_register_set[i as usize].portsc;
+            let portrs = &mut r.port_register_set.read_volatile_at(i as usize);
+            info!(
+                "port{} status(error:{},link_state:{},power:{})",
+                i,
+                portrs.portli.link_error_count(),
+                portrs.portsc.port_link_state(),
+                portrs.portsc.port_power()
+            );
 
             // 检查端口是否连接了设备
             if portsc.read().current_connect_status() {
