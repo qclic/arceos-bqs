@@ -16,7 +16,7 @@ bus-pci = ["dep:driver_pci", "dep:axhal", "dep:axconfig"]
 net = ["driver_net"]
 block = ["driver_block"]
 display = ["driver_display"]
-xhci = ["driver_xhci"]
+xhci = ["driver_xhci", "bus-pci"]
 
 # Enabled by features `virtio-*`
 virtio = ["driver_virtio", "dep:axalloc", "dep:axhal", "dep:axconfig"]

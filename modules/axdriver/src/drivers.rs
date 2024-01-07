@@ -10,9 +10,6 @@ use axalloc::global_allocator;
 use axhal::mem::PhysAddr;
 use driver_common::DeviceType;
 use driver_pci::Command;
-use driver_xhci::{
-    register_operations_init_xhci, XhciController, XhciDriverOps, VL805_DEVICE_ID, VL805_VENDOR_ID,
-};
 use page_table_entry::GenericPTE;
 use page_table_entry::MappingFlags;
 

@@ -9,4 +9,4 @@ pub use {crate::structs::AxDisplayDevice, driver_display::DisplayDriverOps};
 #[cfg(feature = "net")]
 pub use {crate::structs::AxNetDevice, driver_net::NetDriverOps};
 #[cfg(feature = "xhci")]
-pub use {crate::structs::AxXHciDevice, driver_xhci::XhciDriverOps};
+pub use crate::structs::AxXHciDevice;
