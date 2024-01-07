@@ -950,7 +950,6 @@ dependencies = [
 name = "driver_xhci"
 version = "0.1.0"
 dependencies = [
- "aarch64-cpu",
  "axalloc",
  "axhal",
  "driver_common",
@@ -2278,10 +2277,11 @@ dependencies = [
 [[package]]
 name = "xhci"
 version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09f3f0483969259f2adb6524054400d94ac352e59fa37da6c6ca3b9b3d83ff83"
 dependencies = [
  "accessor",
  "bit_field",
- "log",
  "num-derive",
  "num-traits",
  "paste",
