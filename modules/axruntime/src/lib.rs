@@ -29,6 +29,9 @@ mod trap;
 #[cfg(feature = "smp")]
 mod mp;
 
+use axhal::mem::{memory_regions, virt_to_phys};
+use mmemory::BootState;
+
 #[cfg(feature = "smp")]
 pub use self::mp::rust_main_secondary;
 
@@ -92,6 +95,17 @@ fn is_init_ok() -> bool {
     INITED_CPUS.load(Ordering::Acquire) == axconfig::SMP
 }
 
+struct Boot {}
+impl BootState for Boot {
+    fn virt_to_phys(virt: mmemory::VirtAddr) -> mmemory::PhysAddr {
+        virt_to_phys(virt)
+    }
+    
+    fn memory_regions() -> impl Iterator<Item = mmemory::MemRegion> {
+        memory_regions()
+    }
+}
+
 /// The main entry point of the ArceOS runtime.
 ///
 /// It is called from the bootstrapping code in [axhal]. `cpu_id` is the ID of
@@ -138,7 +152,8 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     }
 
     #[cfg(feature = "alloc")]
-    init_allocator();
+    mmemory::init_allocator(Boot{});
+    // init_allocator();
 
     #[cfg(feature = "paging")]
     {

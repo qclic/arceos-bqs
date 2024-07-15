@@ -381,6 +381,7 @@ dependencies = [
  "lazy_init",
  "log",
  "memory_addr",
+ "mmemory",
  "page_table",
  "page_table_entry",
  "percpu",
@@ -460,6 +461,7 @@ dependencies = [
  "crate_interface",
  "kernel_guard",
  "lazy_init",
+ "mmemory",
  "percpu",
 ]
 
@@ -1209,6 +1211,19 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+name = "mmemory"
+version = "0.1.0"
+dependencies = [
+ "aarch64-cpu",
+ "bitflags 2.6.0",
+ "log",
+ "memory_addr",
+ "page_table",
+ "tock-registers",
+ "x86_64 0.15.1",
+]
 
 [[package]]
 name = "nom"
