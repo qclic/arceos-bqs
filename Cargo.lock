@@ -176,7 +176,6 @@ dependencies = [
 name = "arceos_api"
 version = "0.1.0"
 dependencies = [
- "axalloc",
  "axconfig",
  "axdisplay",
  "axerrno",
@@ -369,12 +368,12 @@ dependencies = [
  "aarch64-cpu",
  "arm_gic",
  "arm_pl011",
- "axalloc",
  "axconfig",
  "axlog",
  "bitflags 2.6.0",
  "cfg-if",
  "crate_interface",
+ "critical-section",
  "dw_apb_uart",
  "handler_table",
  "kernel_guard",
@@ -449,7 +448,6 @@ dependencies = [
 name = "axruntime"
 version = "0.1.0"
 dependencies = [
- "axalloc",
  "axconfig",
  "axdisplay",
  "axdriver",
@@ -1217,10 +1215,13 @@ name = "mmemory"
 version = "0.1.0"
 dependencies = [
  "aarch64-cpu",
+ "allocator",
  "bitflags 2.6.0",
+ "cfg-if",
  "log",
  "memory_addr",
  "page_table",
+ "spinlock",
  "tock-registers",
  "x86_64 0.15.1",
 ]

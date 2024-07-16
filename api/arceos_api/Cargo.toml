@@ -13,7 +13,8 @@ documentation = "https://arceos-org.github.io/arceos/arceos_api/index.html"
 default = []
 
 irq = ["axfeat/irq"]
-alloc = ["dep:axalloc", "axfeat/alloc"]
+# alloc = ["dep:axalloc", "axfeat/alloc"]
+alloc = [ "axfeat/alloc"]
 multitask = ["axtask/multitask", "axfeat/multitask"]
 fs = ["dep:axfs", "axfeat/fs"]
 net = ["dep:axnet", "axfeat/net"]
@@ -32,7 +33,7 @@ axlog = { path = "../../modules/axlog" }
 axio = { path = "../../crates/axio" }
 axerrno = { path = "../../crates/axerrno" }
 axhal = { path = "../../modules/axhal" }
-axalloc = { path = "../../modules/axalloc", optional = true }
+# axalloc = { path = "../../modules/axalloc", optional = true }
 axtask = { path = "../../modules/axtask", optional = true }
 axfs = { path = "../../modules/axfs", optional = true }
 axnet = { path = "../../modules/axnet", optional = true }

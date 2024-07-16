@@ -25,16 +25,7 @@ impl ArchCommon for Arch {
             CurrentEL::EL::Value::EL3 => "EL3",
         };
         debug!("EL: {}", el);
-        let kernel_init_size = 0x1000;
 
-
-        let regions = BootState::memory_regions();
-        for region in regions {
-            if region.flags.contains(MemRegionFlags::FREE) {
-                
-                break;
-            }
-        }
 
         self.print_page();
     }

@@ -1,9 +1,18 @@
 #![no_std]
+extern crate alloc;
+
+use allocator::global_init;
 use core::fmt;
+use memory_addr::PAGE_SIZE_4K;
 pub use memory_addr::{PhysAddr, VirtAddr};
+pub(crate) mod allocator;
 pub(crate) mod arch;
+pub mod err;
+
 use arch::*;
 use page_table::MappingFlags;
+
+pub use allocator::global_allocator;
 
 static MEMORY: MMemory = MMemory::new();
 
@@ -17,7 +26,16 @@ impl MMemory {
     }
 
     pub fn init_allocator(&self, boot: impl BootState) {
-        self.arch.init(boot);
+        let kernel_init_size = PAGE_SIZE_4K;
+
+        // let regions = BootState::memory_regions();
+        // for region in regions {
+        //     if region.flags.contains(MemRegionFlags::FREE) {
+        //         break;
+        //     }
+        // }
+
+        // self.arch.init(boot);
     }
 }
 

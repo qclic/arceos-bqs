@@ -13,7 +13,8 @@ documentation = "https://arceos-org.github.io/arceos/axhal/index.html"
 smp = []
 alloc = []
 fp_simd = []
-paging = ["axalloc", "page_table"]
+# paging = ["axalloc", "page_table"]
+paging = ["page_table"]
 irq = []
 tls = ["alloc"]
 default = []
@@ -25,13 +26,14 @@ bitflags = "2.6"
 static_assertions = "1.1.0"
 axlog = { path = "../axlog" }
 axconfig = { path = "../axconfig" }
-axalloc = { path = "../axalloc", optional = true }
+# axalloc = { path = "../axalloc", optional = true }
 kernel_guard = { path = "../../crates/kernel_guard" }
 spinlock = { path = "../../crates/spinlock" }
 ratio = { path = "../../crates/ratio" }
 lazy_init = { path = "../../crates/lazy_init" }
 page_table = { path = "../../crates/page_table", optional = true }
 page_table_entry = { path = "../../crates/page_table_entry" }
+critical-section = { version = "1.1" }
 mmemory = { path = "../../crates/mmemory" }
 percpu = { path = "../../crates/percpu" }
 memory_addr = { path = "../../crates/memory_addr" }
