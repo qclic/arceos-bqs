@@ -32,6 +32,7 @@ mod mp;
 use axhal::mem::{memory_regions, virt_to_phys};
 use core::{alloc::Layout, ptr::NonNull};
 use mmemory::BootState;
+use core::alloc::GlobalAlloc;
 
 #[cfg(feature = "smp")]
 pub use self::mp::rust_main_secondary;
@@ -98,12 +99,12 @@ fn is_init_ok() -> bool {
 
 struct Boot {}
 impl BootState for Boot {
-    fn virt_to_phys(virt: mmemory::VirtAddr) -> mmemory::PhysAddr {
-        virt_to_phys(virt)
-    }
-
     fn memory_regions() -> impl Iterator<Item = mmemory::MemRegion> {
         memory_regions()
+    }
+
+    fn virt_phys_offset() -> usize {
+        axconfig::PHYS_VIRT_OFFSET
     }
 }
 
@@ -153,14 +154,14 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     }
 
     #[cfg(feature = "alloc")]
-    mmemory::init_allocator(Boot {});
+    mmemory::init_allocator::<Boot>();
     // init_allocator();
 
-    #[cfg(feature = "paging")]
-    {
-        info!("Initialize kernel page table...");
-        remap_kernel_memory().expect("remap kernel memoy failed");
-    }
+    // #[cfg(feature = "paging")]
+    // {
+    //     info!("Initialize kernel page table...");
+    //     remap_kernel_memory().expect("remap kernel memoy failed");
+    // }
 
     info!("Initialize platform devices...");
     axhal::platform_init();
@@ -218,6 +219,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
 
 #[cfg(feature = "alloc")]
 pub fn alloc(layout: Layout) -> mmemory::err::Result<NonNull<u8>> {
+    
     mmemory::global_allocator().alloc(layout)
 }
 #[cfg(feature = "alloc")]
@@ -230,7 +232,7 @@ fn init_allocator() {
     use axhal::mem::{memory_regions, phys_to_virt, MemRegionFlags};
 
     info!("Initialize global memory allocator...");
-    info!("  use {} allocator.", mmemory::global_allocator().name());
+    info!("  use {} allocator.", mmemory::allocator_name());
 
     // let mut max_region_size = 0;
     // let mut max_region_paddr = 0.into();
