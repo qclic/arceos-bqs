@@ -1,6 +1,7 @@
 #![no_std]
-extern crate alloc;
 
+extern crate alloc;
+use alloc::vec::Vec;
 use core::{
     alloc::{GlobalAlloc, Layout},
     fmt,
@@ -8,24 +9,33 @@ use core::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use log::debug;
-use memory_addr::PAGE_SIZE_4K;
 pub use memory_addr::{PhysAddr, VirtAddr};
 use spinlock::SpinNoIrq;
 pub(crate) mod allocator;
 pub(crate) mod arch;
 pub mod err;
 pub(crate) mod paging;
-use allocator::{MAllocator, MIN_HEAP_SIZE};
+use allocator::*;
 use arch::*;
 use err::*;
-use page_table::MappingFlags;
 
 static MEMORY: MemoryManager = MemoryManager::new();
 
 struct MemoryManager {
     arch: Arch,
     virt_to_phys_offset: AtomicU64,
-    allocator: SpinNoIrq<MAllocator>,
+    inner: SpinNoIrq<Inner>,
+}
+
+struct FreeRegion {
+    paddr: PhysAddr,
+    offset: usize,
+    size: usize,
+}
+
+struct Inner {
+    allocator: DefaultByteAllocator,
+    free_regions: Vec<FreeRegion>,
 }
 
 impl MemoryManager {
@@ -33,7 +43,10 @@ impl MemoryManager {
         Self {
             arch: Arch::new(),
             virt_to_phys_offset: AtomicU64::new(0),
-            allocator: SpinNoIrq::new(MAllocator::new()),
+            inner: SpinNoIrq::new(Inner {
+                allocator: DefaultByteAllocator::new(),
+                free_regions: Vec::new(),
+            }),
         }
     }
 
@@ -57,15 +70,48 @@ impl MemoryManager {
 
         let regions = B::memory_regions();
 
+        let mut inited_index = None;
+
         for (index, region) in regions.enumerate() {
-            if region.flags.contains(MemRegionFlags::FREE) && region.size >= kernel_init_size {
-                self.allocator
-                    .lock()
-                    .init(self.phys_to_virt(region.paddr).as_usize(), kernel_init_size);
-                break;
+            if region.flags.contains(MemRegionFlags::FREE) {
+                if region.size >= kernel_init_size {
+                    self.inner
+                        .lock()
+                        .allocator
+                        .add_memory(self.phys_to_virt(region.paddr).as_usize(), kernel_init_size)
+                        .unwrap();
+                    inited_index = Some(index);
+                    break;
+                }
             }
         }
 
+        let mut regions = Vec::new();
+
+        let inined_index = inited_index.expect("No enough memory for kernel initialization");
+        for (index, region) in B::memory_regions().enumerate() {
+            if region.flags.contains(MemRegionFlags::FREE) {
+                let mut offset = 0;
+                let size = region.size;
+                if index == inined_index {
+                    offset += kernel_init_size;
+                }
+                regions.push(FreeRegion {
+                    paddr: region.paddr,
+                    offset,
+                    size,
+                });
+            }
+        }
+
+        self.inner.lock().free_regions = regions;
+
+        
+
+
+
+
+        debug!("Init ok");
         // self.arch.init(boot);
     }
 
@@ -134,16 +180,16 @@ pub fn global_allocator() -> &'static GlobalAllocator {
 }
 
 pub fn allocator_name() -> &'static str {
-    MEMORY.allocator.lock().name()
+    allocator::name()
 }
 
 impl GlobalAllocator {
     pub fn alloc(&self, layout: Layout) -> Result<NonNull<u8>> {
-        MEMORY.allocator.lock().alloc(layout)
+        MEMORY.inner.lock().allocator.alloc(layout)
     }
 
     pub fn dealloc(&self, pos: NonNull<u8>, layout: Layout) {
-        MEMORY.allocator.lock().dealloc(pos, layout)
+        MEMORY.inner.lock().allocator.dealloc(pos, layout)
     }
 }
 
