@@ -1221,6 +1221,7 @@ dependencies = [
  "log",
  "memory_addr",
  "page_table",
+ "page_table_entry",
  "spinlock",
  "tock-registers",
  "x86_64 0.15.1",

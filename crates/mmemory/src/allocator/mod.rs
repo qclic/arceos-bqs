@@ -4,7 +4,7 @@
 //! [`core::alloc::GlobalAlloc`]. A static global variable of type
 //! [`GlobalAllocator`] is defined with the `#[global_allocator]` attribute, to
 //! be registered as the standard library’s default allocator.
-
+pub mod table;
 pub use allocator::{BaseAllocator, ByteAllocator};
 
 const PAGE_SIZE: usize = 0x1000;

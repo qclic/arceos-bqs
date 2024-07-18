@@ -192,6 +192,8 @@ impl<M: PagingMetaData, PTE: GenericPTE, IF: PagingIf> PageTable64<M, PTE, IF> {
                     vaddr, page_size, paddr, e
                 )
             })?;
+            trace!("mapped page: {:#x?}({:?}) -> {:#x?}", vaddr, page_size, paddr);
+
             vaddr += page_size as usize;
             paddr += page_size as usize;
             size -= page_size as usize;
