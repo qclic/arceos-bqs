@@ -1,19 +1,14 @@
 #![no_std]
 
 extern crate alloc;
-use aarch64_cpu::registers::SCTLR_EL1::M;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::{
     alloc::{GlobalAlloc, Layout},
-    borrow::BorrowMut,
     fmt,
-    ops::Not,
     ptr::NonNull,
-    sync::atomic::{fence, AtomicU64, Ordering},
 };
 use log::{debug, error, trace};
-use memory_addr::{align_up_4k, PAGE_SIZE_4K};
+use memory_addr::{align_up, PAGE_SIZE_4K};
 pub use memory_addr::{PhysAddr, VirtAddr};
 use page_table::PageSize;
 use page_table_entry::*;
@@ -31,7 +26,6 @@ use paging::*;
 static MEMORY: MemoryManager = MemoryManager::new();
 
 struct MemoryManager {
-    arch: Arch,
     inner: SpinNoIrq<Option<Inner>>,
 }
 
@@ -51,7 +45,6 @@ struct Inner {
 impl MemoryManager {
     const fn new() -> Self {
         Self {
-            arch: Arch::new(),
             inner: SpinNoIrq::new(None),
         }
     }
@@ -109,13 +102,13 @@ impl Inner {
         } else {
             PAGE_SIZE_4K * 12
         };
-
+        let t_paddr;
         unsafe {
             self.allocator
                 .init(self.phys_to_virt(k_paddr).as_usize(), kernel_init_size);
 
             let t_vaddr = self.new_table_frame();
-            let t_paddr = self.virt_to_phys(t_vaddr);
+            t_paddr = self.virt_to_phys(t_vaddr);
 
             let table = PageTable64::new(t_paddr, self.virt_phys_offset);
             self.table = Some(table);
@@ -149,7 +142,7 @@ impl Inner {
                 let size = region.size;
 
                 let offset = if index == inited_index {
-                    kernel_init_size
+                    kernel_init_size + (t_paddr.as_usize() - paddr.as_usize())
                 } else {
                     0
                 };
@@ -169,6 +162,20 @@ impl Inner {
         let table_addr = self.table().root_paddr();
         debug!("Init memory manager ok, {table_addr:?}");
 
+        Arch::write_page_table_kernel(table_addr);
+        Arch::flush_tlb(None);
+    }
+
+    unsafe fn new_table_frame(&mut self) -> VirtAddr {
+        let data = self
+            .allocator
+            .alloc(Layout::from_size_align(PAGE_SIZE_4K, PAGE_SIZE_4K).unwrap())
+            .unwrap();
+        data.as_ptr().write_bytes(0, PAGE_SIZE_4K);
+        VirtAddr::from(data.as_ptr() as usize)
+    }
+
+    fn print_table(&self) {
         self.walk(100, &|level, index, vaddr, pte| {
             trace!(
                 "{}index: {} {:?}",
@@ -183,18 +190,6 @@ impl Inner {
             );
         })
         .unwrap();
-
-        Arch::write_page_table_kernel(table_addr);
-        Arch::flush_tlb(None);
-    }
-
-    unsafe fn new_table_frame(&mut self) -> VirtAddr {
-        let data = self
-            .allocator
-            .alloc(Layout::from_size_align(PAGE_SIZE_4K, PAGE_SIZE_4K).unwrap())
-            .unwrap();
-        data.as_ptr().write_bytes(0, PAGE_SIZE_4K);
-        VirtAddr::from(data.as_ptr() as usize)
     }
 
     fn table<'a>(&'a self) -> &'a PageTable64 {
@@ -357,20 +352,40 @@ impl Inner {
     }
 
     fn alloc(&mut self, layout: Layout) -> Result<NonNull<u8>> {
-        if self.allocator.available_bytes() < PAGE_SIZE_4K
+        if self.allocator.available_bytes() < PAGE_SIZE_4K * 2
             || self.allocator.available_bytes() < layout.size()
         {
-            let size = PhysAddr::from(layout.size()).align_up_4k().as_usize();
+            let mut size = layout.size().max(PAGE_SIZE_4K * 2);
+            size = align_up(size, PageSize::Size2M as usize);
 
             trace!("memory is not enough, try to allocate more memory {size}");
-            // let mut addr = None;
-            // for r in self.free_regions.iter_mut() {
-            //     if r.size - r.offset >= size {
-            //         addr = Some(r.paddr + r.offset);
-            //         r.offset += size;
-            //         break;
-            //     }
-            // }
+
+            let mut addr = None;
+            for r in self.free_regions.iter_mut() {
+                if r.size - r.offset >= size {
+                    addr = Some(r.paddr + r.offset);
+                    r.offset += size;
+                    break;
+                }
+            }
+
+            if let Some(addr) = addr {
+                let vaddr = self.phys_to_virt(addr);
+                self.map_region(
+                    vaddr,
+                    addr,
+                    size,
+                    MappingFlags::READ | MappingFlags::WRITE,
+                    true,
+                )
+                .map_err(|e| {
+                    error!("map region fail: {:?}", e);
+                    AllocError::NoMemory
+                })?;
+                self.allocator.add_memory(vaddr.as_usize(), size)?;
+            } else {
+                return Err(AllocError::NoMemory);
+            }
         }
         Ok(self.allocator.alloc(layout)?)
     }
