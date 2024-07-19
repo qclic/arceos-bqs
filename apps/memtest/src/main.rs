@@ -5,9 +5,24 @@
 #[cfg(feature = "axstd")]
 extern crate axstd as std;
 
+use os_dma::DMACoherent;
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use std::collections::BTreeMap;
 use std::vec::Vec;
+
+fn test_dma(rng: &mut impl RngCore) {
+    const N: usize = 3_000;
+
+    for _ in 0..N {
+        let mut d = DMACoherent::new(1000u64).unwrap();
+        let num = rng.next_u64();
+        d.write_volatile(num);
+        assert_eq!(d.read_volatile(), num);
+
+        drop(d);
+    }
+    println!("test_dma() OK!");
+}
 
 fn test_vec(rng: &mut impl RngCore) {
     const N: usize = 3_000_000;
@@ -43,6 +58,7 @@ fn main() {
     println!("Running memory tests...");
 
     let mut rng = SmallRng::seed_from_u64(0xdead_beef);
+    test_dma(&mut rng);
     test_vec(&mut rng);
     test_btree_map(&mut rng);
 

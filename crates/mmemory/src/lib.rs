@@ -7,8 +7,9 @@ use core::{
     fmt,
     ptr::NonNull,
 };
-use log::{debug, error, trace};
+use log::*;
 use memory_addr::{align_up, PAGE_SIZE_4K};
+use os_dma::DMAInfo;
 use page_table::PageSize;
 use page_table_entry::*;
 use paging::PageTable64;
@@ -38,6 +39,7 @@ struct FreeRegion {
 
 struct Inner {
     allocator: DefaultByteAllocator,
+    allocator_coherent: DefaultByteAllocator,
     table: Option<PageTable64>,
     virt_phys_offset: usize,
     free_regions: Vec<FreeRegion>,
@@ -74,6 +76,7 @@ impl Inner {
             free_regions,
             virt_phys_offset,
             table: None,
+            allocator_coherent: DefaultByteAllocator::new(),
         }
     }
 
@@ -443,7 +446,70 @@ impl Inner {
             func,
         )
     }
+
+    unsafe fn alloc_coherent(&mut self, layout: Layout) -> Option<os_dma::DMAInfo> {
+        if self.allocator_coherent.available_bytes() < layout.size() {
+            let size = align_up(layout.size(), PageSize::Size4K as usize);
+            let mut addr = None;
+            for r in self.free_regions.iter_mut() {
+                if r.size - r.offset >= size {
+                    addr = Some(r.paddr + r.offset);
+                    r.offset += size;
+                    break;
+                }
+            }
+
+            if let Some(addr) = addr {
+                let vaddr = self.phys_to_virt(addr);
+                self.map_region(
+                    vaddr,
+                    addr,
+                    size,
+                    MappingFlags::READ | MappingFlags::WRITE | MappingFlags::UNCACHED,
+                    true,
+                )
+                .unwrap();
+                self.allocator_coherent
+                    .add_memory(vaddr.as_usize(), size)
+                    .unwrap();
+            } else {
+                return None;
+            }
+        }
+
+        match self.allocator_coherent.alloc(layout) {
+            Ok(data) => {
+                let cpu_addr = data.as_ptr() as usize;
+
+                Some(DMAInfo {
+                    cpu_addr,
+                    bus_addr: (cpu_addr - self.virt_phys_offset) as u64,
+                })
+            }
+            Err(_) => None,
+        }
+    }
+
+    unsafe fn dealloc_coherent(&mut self, dma: DMAInfo, layout: Layout) {
+        self.allocator_coherent
+            .dealloc(NonNull::new_unchecked(dma.cpu_addr as *mut u8), layout)
+    }
 }
+
+struct DMAAllocator;
+unsafe impl os_dma::Impl for DMAAllocator {
+    unsafe fn alloc_coherent(layout: Layout) -> Option<os_dma::DMAInfo> {
+        let mut mm = MEMORY.inner.lock();
+        mm.as_mut().unwrap().alloc_coherent(layout)
+    }
+
+    unsafe fn dealloc_coherent(dma: os_dma::DMAInfo, layout: Layout) {
+        let mut mm = MEMORY.inner.lock();
+        mm.as_mut().unwrap().dealloc_coherent(dma, layout)
+    }
+}
+
+os_dma::set_impl!(DMAAllocator);
 
 bitflags::bitflags! {
     /// The flags of a physical memory region.

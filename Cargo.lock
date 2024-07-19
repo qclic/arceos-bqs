@@ -116,6 +116,7 @@ name = "arceos-memtest"
 version = "0.1.0"
 dependencies = [
  "axstd",
+ "os-dma",
  "rand",
 ]
 
@@ -373,7 +374,6 @@ dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
  "crate_interface",
- "critical-section",
  "dw_apb_uart",
  "handler_table",
  "kernel_guard",

@@ -33,7 +33,6 @@ ratio = { path = "../../crates/ratio" }
 lazy_init = { path = "../../crates/lazy_init" }
 page_table = { path = "../../crates/page_table", optional = true }
 page_table_entry = { path = "../../crates/page_table_entry" }
-critical-section = { version = "1.1" }
 mmemory = { path = "../../crates/mmemory" }
 percpu = { path = "../../crates/percpu" }
 memory_addr = { path = "../../crates/memory_addr" }
