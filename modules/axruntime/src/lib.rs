@@ -29,10 +29,9 @@ mod trap;
 #[cfg(feature = "smp")]
 mod mp;
 
-use axhal::mem::{memory_regions, virt_to_phys};
+use axhal::mem::memory_regions;
 use core::{alloc::Layout, ptr::NonNull};
 use mmemory::BootState;
-use core::alloc::GlobalAlloc;
 
 #[cfg(feature = "smp")]
 pub use self::mp::rust_main_secondary;
@@ -154,14 +153,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     }
 
     #[cfg(feature = "alloc")]
-    mmemory::init_allocator::<Boot>();
-    // init_allocator();
-
-    // #[cfg(feature = "paging")]
-    // {
-    //     info!("Initialize kernel page table...");
-    //     remap_kernel_memory().expect("remap kernel memoy failed");
-    // }
+    init_allocator();
 
     info!("Initialize platform devices...");
     axhal::platform_init();
@@ -219,7 +211,6 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
 
 #[cfg(feature = "alloc")]
 pub fn alloc(layout: Layout) -> mmemory::err::Result<NonNull<u8>> {
-    
     mmemory::global_allocator().alloc(layout)
 }
 #[cfg(feature = "alloc")]
@@ -229,57 +220,9 @@ pub fn dealloc(pos: NonNull<u8>, layout: Layout) {
 
 #[cfg(feature = "alloc")]
 fn init_allocator() {
-    use axhal::mem::{memory_regions, phys_to_virt, MemRegionFlags};
-
     info!("Initialize global memory allocator...");
     info!("  use {} allocator.", mmemory::allocator_name());
-
-    // let mut max_region_size = 0;
-    // let mut max_region_paddr = 0.into();
-    // for r in memory_regions() {
-    //     if r.flags.contains(MemRegionFlags::FREE) && r.size > max_region_size {
-    //         max_region_size = r.size;
-    //         max_region_paddr = r.paddr;
-    //     }
-    // }
-    // for r in memory_regions() {
-    //     if r.flags.contains(MemRegionFlags::FREE) && r.paddr == max_region_paddr {
-    //         axalloc::global_init(phys_to_virt(r.paddr).as_usize(), r.size);
-    //         break;
-    //     }
-    // }
-    // for r in memory_regions() {
-    //     if r.flags.contains(MemRegionFlags::FREE) && r.paddr != max_region_paddr {
-    //         axalloc::global_add_memory(phys_to_virt(r.paddr).as_usize(), r.size)
-    //             .expect("add heap memory region failed");
-    //     }
-    // }
-}
-
-#[cfg(feature = "paging")]
-fn remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
-    use axhal::mem::{memory_regions, phys_to_virt};
-    use axhal::paging::PageTable;
-    use lazy_init::LazyInit;
-
-    static KERNEL_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
-
-    if axhal::cpu::this_cpu_is_bsp() {
-        let mut kernel_page_table = PageTable::try_new()?;
-        for r in memory_regions() {
-            kernel_page_table.map_region(
-                phys_to_virt(r.paddr),
-                r.paddr,
-                r.size,
-                r.flags.into(),
-                true,
-            )?;
-        }
-        KERNEL_PAGE_TABLE.init_by(kernel_page_table);
-    }
-
-    unsafe { axhal::arch::write_page_table_root(KERNEL_PAGE_TABLE.root_paddr()) };
-    Ok(())
+    mmemory::init_allocator::<Boot>();
 }
 
 #[cfg(feature = "irq")]

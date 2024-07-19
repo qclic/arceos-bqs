@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(unused)]
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -8,7 +9,7 @@ use core::{
     ptr::NonNull,
 };
 use log::*;
-use memory_addr::{align_up, PAGE_SIZE_4K};
+use memory_addr::align_up;
 use os_dma::DMAInfo;
 use page_table::PageSize;
 use page_table_entry::*;
@@ -24,6 +25,13 @@ use allocator::*;
 use arch::*;
 use err::*;
 use paging::*;
+
+/// Size of 4 kilobytes (2<sup>12</sup> bytes).
+const SIZE_4K: usize = 0x1000;
+/// Size of 2 megabytes (2<sup>21</sup> bytes).
+const SIZE_2M: usize = 0x20_0000;
+/// Size of 1 gigabytes (2<sup>30</sup> bytes).
+const SIZE_1G: usize = 0x4000_0000;
 
 static MEMORY: MemoryManager = MemoryManager::new();
 
@@ -101,10 +109,10 @@ impl Inner {
             }
         }
         let inited_index = inited_index.expect("No enough memory for kernel initialization");
-        let kernel_init_size = if free_all > PageSize::Size2M as usize {
-            PageSize::Size2M as usize
+        let kernel_init_size = if free_all > SIZE_2M {
+            SIZE_2M
         } else {
-            PAGE_SIZE_4K * 12
+            SIZE_4K * 12
         };
         let t_paddr;
         unsafe {
@@ -164,18 +172,20 @@ impl Inner {
         }
         self.free_regions = free_regions;
         let table_addr = self.table().root_paddr();
-        debug!("Init memory manager ok, {table_addr:?}");
+        debug!("Init page table ok, change to {table_addr:#?}");
 
-        Arch::write_page_table_kernel(table_addr);
-        Arch::flush_tlb(None);
+        unsafe {
+            Arch::write_page_table_kernel(table_addr);
+            Arch::flush_tlb(None);
+        }
     }
 
     unsafe fn new_table_frame(&mut self) -> VirtAddr {
         let data = self
             .allocator
-            .alloc(Layout::from_size_align(PAGE_SIZE_4K, PAGE_SIZE_4K).unwrap())
+            .alloc(Layout::from_size_align(SIZE_4K, SIZE_4K).unwrap())
             .unwrap();
-        data.as_ptr().write_bytes(0, PAGE_SIZE_4K);
+        data.as_ptr().write_bytes(0, SIZE_4K);
         VirtAddr::from(data.as_ptr() as usize)
     }
 
@@ -356,40 +366,17 @@ impl Inner {
     }
 
     fn alloc(&mut self, layout: Layout) -> Result<NonNull<u8>> {
-        if self.allocator.available_bytes() < PAGE_SIZE_4K * 2
-            || self.allocator.available_bytes() < layout.size()
-        {
-            let mut size = layout.size().max(PAGE_SIZE_4K * 2);
-            size = align_up(size, PageSize::Size2M as usize);
+        let mut size = layout.size().max(SIZE_4K * 2);
+        if self.allocator.available_bytes() < size {
+            size = align_up(size, SIZE_2M);
 
-            trace!("memory is not enough, try to allocate more memory {size}");
+            trace!("memory is not enough, try to allocate more memory {size:#X}");
 
-            let mut addr = None;
-            for r in self.free_regions.iter_mut() {
-                if r.size - r.offset >= size {
-                    addr = Some(r.paddr + r.offset);
-                    r.offset += size;
-                    break;
-                }
-            }
+            let vaddr = self
+                .map_free_region(size, MappingFlags::READ | MappingFlags::WRITE)
+                .ok_or(AllocError::NoMemory)?;
 
-            if let Some(addr) = addr {
-                let vaddr = self.phys_to_virt(addr);
-                self.map_region(
-                    vaddr,
-                    addr,
-                    size,
-                    MappingFlags::READ | MappingFlags::WRITE,
-                    true,
-                )
-                .map_err(|e| {
-                    error!("map region fail: {:?}", e);
-                    AllocError::NoMemory
-                })?;
-                self.allocator.add_memory(vaddr.as_usize(), size)?;
-            } else {
-                return Err(AllocError::NoMemory);
-            }
+            self.allocator.add_memory(vaddr.as_usize(), size).unwrap();
         }
         Ok(self.allocator.alloc(layout)?)
     }
@@ -424,6 +411,26 @@ impl Inner {
         }
         Ok(())
     }
+
+    fn map_free_region<'a>(&'a mut self, size: usize, flags: MappingFlags) -> Option<VirtAddr> {
+        let mut addr = None;
+        for r in self.free_regions.iter_mut() {
+            if r.size - r.offset >= size {
+                addr = Some(r.paddr + r.offset);
+                r.offset += size;
+                break;
+            }
+        }
+
+        if let Some(addr) = addr {
+            let vaddr = self.phys_to_virt(addr);
+            self.map_region(vaddr, addr, size, flags, true).unwrap();
+            return Some(vaddr);
+        } else {
+            return None;
+        }
+    }
+
     /// Walk the page table recursively.
     ///
     /// When reaching the leaf page table, call `func` on the current page table
@@ -449,32 +456,14 @@ impl Inner {
 
     unsafe fn alloc_coherent(&mut self, layout: Layout) -> Option<os_dma::DMAInfo> {
         if self.allocator_coherent.available_bytes() < layout.size() {
-            let size = align_up(layout.size(), PageSize::Size4K as usize);
-            let mut addr = None;
-            for r in self.free_regions.iter_mut() {
-                if r.size - r.offset >= size {
-                    addr = Some(r.paddr + r.offset);
-                    r.offset += size;
-                    break;
-                }
-            }
-
-            if let Some(addr) = addr {
-                let vaddr = self.phys_to_virt(addr);
-                self.map_region(
-                    vaddr,
-                    addr,
-                    size,
-                    MappingFlags::READ | MappingFlags::WRITE | MappingFlags::UNCACHED,
-                    true,
-                )
+            let size = align_up(layout.size(), SIZE_4K);
+            let vaddr = self.map_free_region(
+                size,
+                MappingFlags::READ | MappingFlags::WRITE | MappingFlags::UNCACHED,
+            )?;
+            self.allocator_coherent
+                .add_memory(vaddr.as_usize(), size)
                 .unwrap();
-                self.allocator_coherent
-                    .add_memory(vaddr.as_usize(), size)
-                    .unwrap();
-            } else {
-                return None;
-            }
         }
 
         match self.allocator_coherent.alloc(layout) {

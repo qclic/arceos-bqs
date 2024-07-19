@@ -1,13 +1,8 @@
 //! Physical memory management.
-
-use core::fmt;
-
 #[doc(no_inline)]
 pub use memory_addr::{PhysAddr, VirtAddr, PAGE_SIZE_4K};
 
 pub use mmemory::{MemRegion, MemRegionFlags};
-
-
 
 /// Converts a virtual address to a physical address.
 ///

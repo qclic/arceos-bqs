@@ -1223,8 +1223,11 @@ dependencies = [
  "os-dma",
  "page_table",
  "page_table_entry",
+ "riscv",
+ "sbi-rt",
  "spinlock",
  "tock-registers",
+ "x86",
  "x86_64 0.15.1",
 ]
 

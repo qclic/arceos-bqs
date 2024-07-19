@@ -1,8 +1,7 @@
 //! Page table manipulation.
 
 use crate::{err::*, Arch, ArchCommon, MemRegionFlags, PageEntry, PhysAddr, VirtAddr};
-
-use core::{mem::size_of, ptr::slice_from_raw_parts_mut};
+use core::mem::size_of;
 use page_table_entry::*;
 
 const ENTRY_COUNT: usize = 512;

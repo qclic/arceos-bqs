@@ -1,20 +1,14 @@
+use super::ArchCommon;
+use crate::{BootState, PhysAddr, VirtAddr};
 use memory_addr::PAGE_SIZE_4K;
 use page_table_entry::aarch64::A64PTE;
-
-use super::ArchCommon;
-use crate::{BootState, PageTableInfo, PhysAddr, VirtAddr};
+use x86::{controlregs, msr, tlb};
 
 pub struct Arch {}
 
 impl ArchCommon for Arch {
-    fn init(&self, boot_state: impl BootState) {
-        todo!();
-    }
-    fn write_page_table_kernel(addr: PhysAddr) {
-        todo!();
-    }
-    fn page_table_info() -> PageTableInfo {
-        todo!();
+    unsafe fn write_page_table_kernel(addr: PhysAddr) {
+        unsafe { controlregs::cr3_write(addr.as_usize() as _) }
     }
 
     const PAGE_LEVEL: usize = 4;
@@ -23,6 +17,14 @@ impl ArchCommon for Arch {
 
     const PAGE_PA_MAX_BITS: usize = 52;
     const PAGE_VA_MAX_BITS: usize = 48;
+
+    unsafe fn flush_tlb(vaddr: Option<VirtAddr>) {
+        if let Some(vaddr) = vaddr {
+            unsafe { tlb::flush(vaddr.into()) }
+        } else {
+            unsafe { tlb::flush_all() }
+        }
+    }
 }
 impl Arch {
     pub const fn new() -> Self {
