@@ -36,6 +36,7 @@ members = [
     "crates/timer_list",
     "crates/tuple_for_each",
     "crates/mmemory",
+    "crates/os-dma",
 
     "modules/axalloc",
     "modules/axconfig",
@@ -70,7 +71,7 @@ members = [
     "apps/task/sleep",
     "apps/task/yield",
     "apps/task/priority",
-    "apps/task/tls", "crates/mmemory",
+    "apps/task/tls", "crates/mmemory", "crates/os-dma",
 ]
 
 [profile.release]

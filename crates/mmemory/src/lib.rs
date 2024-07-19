@@ -9,15 +9,16 @@ use core::{
 };
 use log::{debug, error, trace};
 use memory_addr::{align_up, PAGE_SIZE_4K};
-pub use memory_addr::{PhysAddr, VirtAddr};
 use page_table::PageSize;
 use page_table_entry::*;
 use paging::PageTable64;
 use spinlock::SpinNoIrq;
+mod addr;
 pub(crate) mod allocator;
 pub(crate) mod arch;
 pub mod err;
 pub(crate) mod paging;
+pub use addr::*;
 use allocator::*;
 use arch::*;
 use err::*;
