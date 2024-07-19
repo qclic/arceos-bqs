@@ -2,7 +2,7 @@
 
 use core::{alloc::Layout, marker::PhantomData, ptr};
 
-use crate::{alloc_coherent, dealloc_coherent, DMAInfo};
+use crate::{alloc_coherent, dealloc_coherent, BusAddr, DMAInfo};
 
 pub struct DMACoherent<T> {
     info: DMAInfo,
@@ -42,6 +42,10 @@ impl<T> DMACoherent<T> {
             core::ptr::write_volatile(self.as_mut_ptr(), val);
         }
     }
+
+    pub fn bus_addr(&self) -> BusAddr {
+        BusAddr::new(self.info.bus_addr)
+    }
 }
 
 impl<T> Drop for DMACoherent<T> {
@@ -67,9 +71,9 @@ mod test {
     use super::DMACoherent;
 
     struct A {}
-    impl Impl for A {
-        fn alloc_coherent(layout: Layout) -> Option<crate::DMAInfo> {
-            let ptr = unsafe { alloc::alloc::alloc(layout) };
+    unsafe impl Impl for A {
+        unsafe fn alloc_coherent(layout: Layout) -> Option<crate::DMAInfo> {
+            let ptr = alloc::alloc::alloc(layout);
             if ptr.is_null() {
                 return None;
             }
@@ -80,8 +84,8 @@ mod test {
             })
         }
 
-        fn dealloc_coherent(dma: DMAInfo, layout: Layout) {
-            unsafe { alloc::alloc::dealloc(dma.cpu_addr as *mut u8, layout) }
+        unsafe fn dealloc_coherent(dma: DMAInfo, layout: Layout) {
+            alloc::alloc::dealloc(dma.cpu_addr as *mut u8, layout)
         }
     }
 

@@ -1220,6 +1220,7 @@ dependencies = [
  "cfg-if",
  "log",
  "memory_addr",
+ "os-dma",
  "page_table",
  "page_table_entry",
  "spinlock",

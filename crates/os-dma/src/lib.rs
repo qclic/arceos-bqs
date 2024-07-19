@@ -3,7 +3,11 @@
 use core::alloc::Layout;
 
 extern crate alloc;
+mod addr;
 mod buffer;
+
+pub use addr::BusAddr;
+pub use buffer::DMACoherent;
 
 #[derive(Debug, Clone, Copy)]
 pub struct DMAInfo {
@@ -11,12 +15,12 @@ pub struct DMAInfo {
     pub bus_addr: u64,
 }
 
-pub trait Impl {
-    fn alloc_coherent(layout: Layout) -> Option<DMAInfo>;
-    fn dealloc_coherent(dma: DMAInfo, layout: Layout);
+pub unsafe trait Impl {
+    unsafe fn alloc_coherent(layout: Layout) -> Option<DMAInfo>;
+    unsafe fn dealloc_coherent(dma: DMAInfo, layout: Layout);
 }
 
-pub trait Coherent {}
+// pub trait Coherent {}
 
 #[macro_export]
 macro_rules! set_impl {
@@ -44,13 +48,6 @@ pub(crate) unsafe fn alloc_coherent(layout: Layout) -> Option<DMAInfo> {
     _os_dma_0_0_alloc_coherent(layout)
 }
 
-/// Release the critical section.
-///
-/// This function is extremely low level. Strongly prefer using [`with`] instead.
-///
-/// # Safety
-///
-/// See [`acquire`] for the safety contract description.
 #[inline(always)]
 pub(crate) unsafe fn dealloc_coherent(dma: DMAInfo, layout: Layout) {
     extern "Rust" {

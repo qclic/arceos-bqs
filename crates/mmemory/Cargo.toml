@@ -21,6 +21,7 @@ page_table_entry = { path = "../page_table_entry" }
 allocator = { path = "../allocator", features = ["bitmap"] }
 cfg-if = "1.0"
 spinlock = { path = "../spinlock" }
+os-dma = { path = "../os-dma" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.15"
