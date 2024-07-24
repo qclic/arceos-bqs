@@ -4,11 +4,34 @@
 #[macro_use]
 #[cfg(feature = "axstd")]
 extern crate axstd as std;
+#[cfg(feature = "axstd")]
+use os_dma::ArrayCoherent;
 
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use std::collections::BTreeMap;
 use std::vec::Vec;
 
+/// Test DMA
+#[cfg(feature = "axstd")]
+fn test_dma(rng: &mut impl RngCore) {
+    const N: usize = 30;
+
+    let mut array = ArrayCoherent::zero(N, 4096).unwrap();
+
+    for i in 0..N {
+        array.write_volatile_at((rng.next_u32() & 0xFF) as u8, i);
+    }
+
+    println!("{:?}", array.bus_addr());
+
+    let mut array2 = ArrayCoherent::zero(N, 4096).unwrap();
+    for i in 0..N {
+        array2.write_volatile_at((rng.next_u32() & 0xFF) as u8, i);
+    }
+    println!("{:?}", array2.bus_addr());
+
+    println!("test_dma() OK!");
+}
 fn test_vec(rng: &mut impl RngCore) {
     const N: usize = 3_000_000;
     let mut v = Vec::with_capacity(N);
@@ -43,6 +66,9 @@ fn main() {
     println!("Running memory tests...");
 
     let mut rng = SmallRng::seed_from_u64(0xdead_beef);
+
+    #[cfg(feature = "axstd")]
+    test_dma(&mut rng);
     test_vec(&mut rng);
     test_btree_map(&mut rng);
 

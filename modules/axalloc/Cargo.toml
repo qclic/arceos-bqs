@@ -21,4 +21,11 @@ cfg-if = "1.0"
 kspin = "0.1"
 memory_addr = "0.2"
 axerrno = "0.1"
-allocator = { git = "https://github.com/arceos-org/allocator.git", tag ="v0.1.0", features = ["bitmap"] }
+allocator = { git = "https://github.com/arceos-org/allocator.git", tag = "v0.1.0", features = [
+    "bitmap",
+] }
+bitflags = "2.6"
+page_table_entry = "0.1"
+page_table_multiarch = { version = "0.2" }
+os-dma = { workspace = true }
+axconfig ={ workspace = true }

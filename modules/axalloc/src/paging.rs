@@ -1,12 +1,9 @@
 //! Page table manipulation.
 
-use axalloc::global_allocator;
+use crate::mem::{phys_to_virt, virt_to_phys, PhysAddr, VirtAddr};
+use crate::{global_allocator, SIZE_4K};
+use core::{alloc::Layout, ptr::NonNull};
 use page_table_multiarch::PagingHandler;
-
-use crate::mem::{phys_to_virt, virt_to_phys, PhysAddr, VirtAddr, PAGE_SIZE_4K};
-
-#[doc(no_inline)]
-pub use axalloc::{MappingFlags, PagingResult};
 
 /// Implementation of [`PagingHandler`], to provide physical memory manipulation to
 /// the [page_table_multiarch] crate.
@@ -14,14 +11,24 @@ pub struct PagingHandlerImpl;
 
 impl PagingHandler for PagingHandlerImpl {
     fn alloc_frame() -> Option<PhysAddr> {
-        global_allocator()
-            .alloc_pages(1, PAGE_SIZE_4K)
-            .map(|vaddr| virt_to_phys(vaddr.into()))
-            .ok()
+        unsafe {
+            let layout = Layout::from_size_align_unchecked(SIZE_4K, SIZE_4K);
+            global_allocator()
+                .alloc_nolock(layout)
+                .inspect(|ptr| ptr.as_ptr().write_bytes(0, SIZE_4K))
+                .map(|vaddr| virt_to_phys(VirtAddr::from(vaddr.as_ptr() as usize)))
+                .ok()
+        }
     }
 
     fn dealloc_frame(paddr: PhysAddr) {
-        global_allocator().dealloc_pages(phys_to_virt(paddr).as_usize(), 1)
+        unsafe {
+            let layout = Layout::from_size_align_unchecked(SIZE_4K, SIZE_4K);
+            global_allocator().dealloc_nolock(
+                NonNull::new_unchecked(phys_to_virt(paddr).as_usize() as _),
+                layout,
+            )
+        }
     }
 
     #[inline]

@@ -102,6 +102,7 @@ name = "arceos-memtest"
 version = "0.1.0"
 dependencies = [
  "axstd",
+ "os-dma",
  "rand",
 ]
 
@@ -243,11 +244,16 @@ name = "axalloc"
 version = "0.1.0"
 dependencies = [
  "allocator",
+ "axconfig",
  "axerrno",
+ "bitflags 2.6.0",
  "cfg-if",
  "kspin",
  "log",
  "memory_addr",
+ "os-dma",
+ "page_table_entry 0.1.2",
+ "page_table_multiarch",
 ]
 
 [[package]]
@@ -442,7 +448,7 @@ dependencies = [
  "lazyinit",
  "log",
  "memory_addr",
- "page_table_entry",
+ "page_table_entry 0.2.0",
  "page_table_multiarch",
  "percpu",
  "raw-cpuid 11.0.2",
@@ -812,6 +818,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
+name = "embedded-dma"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "994f7e5b5cb23521c22304927195f236813053eb9c065dd2226a32ba64695446"
+dependencies = [
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "embedded-graphics"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,6 +1142,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "os-dma"
+version = "0.1.3"
+source = "git+https://gitee.com/zr233/os-dma.git?tag=v0.1.3#6e4a6a529f229de4f93e0d22cfecc6703fa5f5ce"
+dependencies = [
+ "embedded-dma",
+]
+
+[[package]]
 name = "page_table_entry"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1139,14 +1162,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "page_table_multiarch"
-version = "0.1.2"
+name = "page_table_entry"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1445dd432e6b83ccf27008835c7963cfdc107852f6f15edc7a3523dcf4da1ac"
+checksum = "22167b7a4e1704c44818dde7eb3f4d5889445fc7ce3d3004676bee9aef8deb2a"
+dependencies = [
+ "aarch64-cpu",
+ "bitflags 2.6.0",
+ "memory_addr",
+ "x86_64 0.15.1",
+]
+
+[[package]]
+name = "page_table_multiarch"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7951f768a20e44778c14789c188a12cef428fb36232839c9a9df7c1aaba9c354"
 dependencies = [
  "log",
  "memory_addr",
- "page_table_entry",
+ "page_table_entry 0.2.0",
 ]
 
 [[package]]
