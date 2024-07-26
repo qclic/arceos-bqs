@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "modules/axalloc",
+    "modules/axdma",
     "modules/axconfig",
     "modules/axdisplay",
     "modules/axdriver",
@@ -57,6 +58,8 @@ axnet = { path = "modules/axnet" }
 axruntime = { path = "modules/axruntime" }
 axsync = { path = "modules/axsync" }
 axtask = { path = "modules/axtask" }
+axdma = { path = "modules/axdma" }
+os-dma = { git = "https://gitee.com/zr233/os-dma.git", tag = "v0.1.3" }
 
 [profile.release]
 lto = true

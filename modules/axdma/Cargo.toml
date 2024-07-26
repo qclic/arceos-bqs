@@ -1,0 +1,35 @@
+[package]
+name = "axdma"
+edition = "2021"
+version.workspace = true
+authors = ["Zhour Rui <zrufo747@outlook.com>"]
+license.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository = "https://github.com/arceos-org/arceos/tree/main/modules/axdma"
+documentation = "https://arceos-org.github.io/arceos/axdma/index.html"
+
+
+[features]
+default = ["tlsf"]
+tlsf = ["allocator/tlsf"]
+slab = ["allocator/slab"]
+buddy = ["allocator/buddy"]
+
+[dependencies]
+log = "0.4"
+cfg-if = "1.0"
+kspin = "0.1"
+memory_addr = "0.2"
+axerrno = "0.1"
+allocator = { git = "https://github.com/arceos-org/allocator.git", tag = "v0.1.0", features = [
+    "bitmap",
+] }
+bitflags = "2.6"
+page_table_entry = "0.2"
+page_table_multiarch = { version = "0.2" }
+axalloc = { workspace = true }
+os-dma = { workspace = true }
+axconfig = { workspace = true }
+axhal = { workspace = true }

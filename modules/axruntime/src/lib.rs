@@ -148,7 +148,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     #[cfg(feature = "paging")]
     {
         info!("Initialize kernel page table...");
-        remap_kernel_memory().expect("remap kernel memoy failed");
+        paging::remap_kernel_memory().expect("remap kernel memoy failed");
     }
 
     info!("Initialize platform devices...");
@@ -235,29 +235,57 @@ fn init_allocator() {
 }
 
 #[cfg(feature = "paging")]
-fn remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
+mod paging {
     use axhal::mem::{memory_regions, phys_to_virt};
-    use axhal::paging::PageTable;
+    use axhal::{mem::VirtAddr, paging::MappingFlags, paging::PageTable};
     use lazyinit::LazyInit;
 
-    static KERNEL_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
-
-    if axhal::cpu::this_cpu_is_bsp() {
-        let mut kernel_page_table = PageTable::try_new()?;
-        for r in memory_regions() {
-            kernel_page_table.map_region(
-                phys_to_virt(r.paddr),
-                r.paddr,
-                r.size,
-                r.flags.into(),
-                true,
-            )?;
+    static mut KERNEL_PAGE_TABLE: LazyInit<PageTable> = LazyInit::new();
+    pub(super) fn remap_kernel_memory() -> Result<(), axhal::paging::PagingError> {
+        if axhal::cpu::this_cpu_is_bsp() {
+            let mut kernel_page_table = PageTable::try_new()?;
+            for r in memory_regions() {
+                kernel_page_table.map_region(
+                    phys_to_virt(r.paddr),
+                    r.paddr,
+                    r.size,
+                    r.flags.into(),
+                    true,
+                )?;
+            }
+            unsafe { KERNEL_PAGE_TABLE.init_once(kernel_page_table) };
         }
-        KERNEL_PAGE_TABLE.init_once(kernel_page_table);
+
+        unsafe { axhal::arch::write_page_table_root(KERNEL_PAGE_TABLE.root_paddr()) };
+
+        axdma::init_allocator();
+        Ok(())
     }
 
-    unsafe { axhal::arch::write_page_table_root(KERNEL_PAGE_TABLE.root_paddr()) };
-    Ok(())
+    #[no_mangle]
+    extern "Rust" fn _table_remap(mut vaddr: VirtAddr, size: usize, flags: MappingFlags) {
+        unsafe {
+            let (mut paddr, _, page_size) = KERNEL_PAGE_TABLE.query(vaddr).unwrap();
+            let page_size = page_size as usize;
+            let page_count = size / page_size;
+            for _ in 0..page_count {
+                let map_size = KERNEL_PAGE_TABLE
+                    .get_mut()
+                    .unwrap()
+                    .remap(vaddr, paddr, flags)
+                    .unwrap();
+
+                trace!("remap {:?} => {:?} len: {:?}", vaddr, paddr, map_size);
+                vaddr += map_size as usize;
+                paddr += map_size as usize;
+
+                let (_, flags, _) = KERNEL_PAGE_TABLE.query(vaddr).unwrap();
+
+                axhal::arch::flush_tlb(Some(vaddr));
+                trace!("flags: {:?}", flags);
+            }
+        }
+    }
 }
 
 #[cfg(feature = "irq")]
