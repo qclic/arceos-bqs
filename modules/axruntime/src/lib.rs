@@ -236,7 +236,7 @@ fn init_allocator() {
 
 #[cfg(feature = "paging")]
 mod paging {
-    use axhal::mem::{memory_regions, phys_to_virt};
+    use axhal::mem::{memory_regions, phys_to_virt, MemRegionFlags};
     use axhal::{mem::VirtAddr, paging::MappingFlags, paging::PageTable};
     use lazyinit::LazyInit;
 
@@ -245,12 +245,14 @@ mod paging {
         if axhal::cpu::this_cpu_is_bsp() {
             let mut kernel_page_table = PageTable::try_new()?;
             for r in memory_regions() {
+                // Free memory region is always 4K for update flag.
+                let allow_huge = !r.flags.contains(MemRegionFlags::FREE);
                 kernel_page_table.map_region(
                     phys_to_virt(r.paddr),
                     r.paddr,
                     r.size,
                     r.flags.into(),
-                    true,
+                    allow_huge,
                 )?;
             }
             unsafe { KERNEL_PAGE_TABLE.init_once(kernel_page_table) };
@@ -269,20 +271,15 @@ mod paging {
             let page_size = page_size as usize;
             let page_count = size / page_size;
             for _ in 0..page_count {
-                let map_size = KERNEL_PAGE_TABLE
+                let map_size = page_size;
+                KERNEL_PAGE_TABLE
                     .get_mut()
                     .unwrap()
-                    .remap(vaddr, paddr, flags)
+                    .protect(vaddr, flags)
                     .unwrap();
-
-                trace!("remap {:?} => {:?} len: {:?}", vaddr, paddr, map_size);
+                axhal::arch::flush_tlb(Some(vaddr));          
                 vaddr += map_size as usize;
                 paddr += map_size as usize;
-
-                let (_, flags, _) = KERNEL_PAGE_TABLE.query(vaddr).unwrap();
-
-                axhal::arch::flush_tlb(Some(vaddr));
-                trace!("flags: {:?}", flags);
             }
         }
     }
