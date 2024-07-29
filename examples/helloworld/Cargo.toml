@@ -8,4 +8,3 @@ authors = ["Yuekai Jia <equation618@gmail.com>"]
 
 [dependencies]
 axstd = { workspace = true, optional = true, features = ["paging"]}
-os-dma ={ workspace = true}

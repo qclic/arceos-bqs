@@ -51,7 +51,6 @@ name = "arceos-helloworld"
 version = "0.1.0"
 dependencies = [
  "axstd",
- "os-dma",
 ]
 
 [[package]]
