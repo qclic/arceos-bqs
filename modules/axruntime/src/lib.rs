@@ -277,9 +277,9 @@ mod paging {
                     .unwrap()
                     .protect(vaddr, flags)
                     .unwrap();
-                axhal::arch::flush_tlb(Some(vaddr));          
-                vaddr += map_size as usize;
-                paddr += map_size as usize;
+                axhal::arch::flush_tlb(Some(vaddr));
+                vaddr += map_size;
+                paddr += map_size;
             }
         }
     }
