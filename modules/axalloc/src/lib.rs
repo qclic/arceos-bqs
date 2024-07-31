@@ -25,11 +25,11 @@ pub use page::GlobalPage;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "slab")] {
-        use allocator::SlabByteAllocator as DefaultByteAllocator;
+        pub use allocator::SlabByteAllocator as DefaultByteAllocator;
     } else if #[cfg(feature = "buddy")] {
-        use allocator::BuddyByteAllocator as DefaultByteAllocator;
+        pub use allocator::BuddyByteAllocator as DefaultByteAllocator;
     } else if #[cfg(feature = "tlsf")] {
-        use allocator::TlsfByteAllocator as DefaultByteAllocator;
+        pub use allocator::TlsfByteAllocator as DefaultByteAllocator;
     }
 }
 
