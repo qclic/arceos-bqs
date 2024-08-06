@@ -1,8 +1,9 @@
-use core::{alloc::Layout, mem, ptr::NonNull};
+use core::{alloc::Layout, borrow::Borrow, mem, ptr::NonNull};
 
 use alloc::{sync::Arc, vec::Vec};
 
 use axalloc::global_allocator;
+use axdma::{alloc_coherent, dealloc_coherent, BusAddr};
 use axdriver_base::{BaseDriverOps, DeviceType};
 use axdriver_net::{DevError, NetBufPtr, NetDriverOps};
 use axhal::mem::{phys_to_virt, PhysAddr, VirtAddr};
@@ -52,7 +53,7 @@ impl E1000E {
             .filter_map(|cap| {
                 if let PciCapability::MsiX(mut msi) = cap {
                     msi.set_enabled(true, pcie.as_ref());
-                    
+
                     Some(())
                 } else {
                     None
@@ -205,19 +206,23 @@ impl<C: Chip> KernelFunc for KFun<C> {
     }
 
     fn dma_alloc_coherent(&self, size: usize) -> DMAInfo {
-        let addr = global_allocator()
-            .alloc(Layout::from_size_align(size, size).unwrap())
-            .unwrap();
-
+        let dma = unsafe { alloc_coherent(Layout::from_size_align_unchecked(size, size)) }.unwrap();
         DMAInfo {
-            dma_addr: axhal::mem::virt_to_phys(VirtAddr::from(addr.as_ptr() as usize)).as_usize()
-                as u64,
-            cpu_addr: addr.as_ptr() as usize,
+            dma_addr: dma.bus_addr.as_u64(),
+            cpu_addr: dma.cpu_addr.as_ptr() as usize,
             size,
         }
     }
 
-    fn dma_free_coherent(&self, dma: e1000_driver::e1000::DMAInfo) {}
+    fn dma_free_coherent(&self, dma: e1000_driver::e1000::DMAInfo) {
+        unsafe {
+            let info = axdma::DMAInfo {
+                cpu_addr: NonNull::new_unchecked(dma.cpu_addr as *mut u8),
+                bus_addr: BusAddr::new(dma.dma_addr),
+            };
+            dealloc_coherent(info, Layout::from_size_align_unchecked(dma.size, dma.size));
+        }
+    }
 
     fn enable_net(&self) {}
 

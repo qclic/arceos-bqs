@@ -30,6 +30,14 @@ virtio-gpu = ["display", "virtio", "axdriver_virtio/gpu"]
 ramdisk = ["block", "axdriver_block/ramdisk"]
 bcm2835-sdhci = ["block", "axdriver_block/bcm2835-sdhci"]
 ixgbe = ["net", "axdriver_net/ixgbe", "dep:axalloc", "dep:axhal", "dep:axdma"]
+e1000 = [
+    "net",
+    "dep:axalloc",
+    "dep:axhal",
+    "dep:axdma",
+    "e1000-driver",
+    "bus-pci",
+]
 # more devices example: e1000 = ["net", "axdriver_net/e1000"]
 
 default = ["bus-pci"]
@@ -47,3 +55,6 @@ axalloc = { workspace = true, optional = true }
 axhal = { workspace = true, optional = true }
 axconfig = { workspace = true, optional = true }
 axdma = { workspace = true, optional = true }
+kspin = { version = "0" }
+pcie = { path = "../../../pcie" }
+e1000-driver = { git = "https://gitee.com/zr233/e1000-rust.git", bratch = "dev-v3-6.6", tag = "v0.2.3", optional = true }
