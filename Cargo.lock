@@ -8,7 +8,7 @@ version = "9.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac42a04a61c19fc8196dd728022a784baecc5d63d7e256c01ad1b3fbfab26287"
 dependencies = [
- "tock-registers",
+ "tock-registers 0.8.1",
 ]
 
 [[package]]
@@ -127,7 +127,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d25e73c949c69f75d1b9dba39c5475523403b31eb8c2fdc99da4dc33bc1aca"
 dependencies = [
- "tock-registers",
+ "tock-registers 0.8.1",
 ]
 
 [[package]]
@@ -136,7 +136,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efcf6afca4502993a737ba1e00952d1321078689da92bf7aab27d4e5756c0bec"
 dependencies = [
- "tock-registers",
+ "tock-registers 0.8.1",
 ]
 
 [[package]]
@@ -208,7 +208,10 @@ dependencies = [
  "axdriver_virtio",
  "axhal",
  "cfg-if",
+ "e1000-driver",
+ "kspin",
  "log",
+ "pcie",
 ]
 
 [[package]]
@@ -375,7 +378,7 @@ dependencies = [
  "riscv_goldfish",
  "sbi-rt",
  "static_assertions",
- "tock-registers",
+ "tock-registers 0.8.1",
  "x2apic",
  "x86",
  "x86_64 0.15.1",
@@ -519,7 +522,7 @@ source = "git+https://github.com/lhw2002426/bcm2835-sdhci.git?rev=e974f16#e974f1
 dependencies = [
  "aarch64-cpu",
  "log",
- "tock-registers",
+ "tock-registers 0.8.1",
  "volatile 0.2.7",
 ]
 
@@ -734,7 +737,16 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f93d496c8faa9dc676ebfa225432e1e3b57645c9268ead889286546f6d39356d"
 dependencies = [
- "tock-registers",
+ "tock-registers 0.8.1",
+]
+
+[[package]]
+name = "e1000-driver"
+version = "0.2.3"
+source = "git+https://gitee.com/zr233/e1000-rust.git?tag=v0.2.3#df0da2de3e697ecca996b77ce41393dad30ea704"
+dependencies = [
+ "log",
+ "volatile 0.6.1",
 ]
 
 [[package]]
@@ -1070,6 +1082,27 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pci_types"
+version = "0.10.0"
+source = "git+https://github.com/ZR233/pci_types.git?branch=set_bus#bd81923619d9a8aecbd52efb96266ff9765cc23e"
+dependencies = [
+ "bit_field",
+ "bitflags 2.6.0",
+]
+
+[[package]]
+name = "pcie"
+version = "0.1.0"
+dependencies = [
+ "bit_field",
+ "embedded-hal",
+ "log",
+ "pci_types",
+ "tock-registers 0.9.0",
+ "volatile 0.6.1",
+]
 
 [[package]]
 name = "percpu"
@@ -1451,6 +1484,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "696941a0aee7e276a165a978b37918fd5d22c55c3d6bda197813070ca9c0f21c"
 
 [[package]]
+name = "tock-registers"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b9e2fdb3a1e862c0661768b7ed25390811df1947a8acbfbefe09b47078d93c4"
+
+[[package]]
 name = "toml_datetime"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1513,6 +1552,12 @@ name = "volatile"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
+
+[[package]]
+name = "volatile"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af8ca9a5d4debca0633e697c88269395493cebf2e10db21ca2dbde37c1356452"
 
 [[package]]
 name = "wasi"

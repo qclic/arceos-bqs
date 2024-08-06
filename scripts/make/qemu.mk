@@ -12,6 +12,11 @@ endif
 
 qemu_args-x86_64 := \
   -machine q35 \
+    -device pcie-pci-bridge,id=pcie_pci_bridge1,bus=pcie.0\
+    -device pcie-pci-bridge,id=pcie_pci_bridge2,bus=pcie.0 \
+    -device pcie-pci-bridge,id=pcie_pci_bridge3,bus=pcie_pci_bridge1 \
+    -device pcie-pci-bridge,id=pcie_pci_bridge4,bus=pcie_pci_bridge3 \
+    -device pcie-pci-bridge,id=pcie_pci_bridge5,bus=pcie_pci_bridge3 \
   -kernel $(OUT_ELF)
 
 qemu_args-riscv64 := \
@@ -31,7 +36,8 @@ qemu_args-$(BLK) += \
   -drive id=disk0,if=none,format=raw,file=$(DISK_IMG)
 
 qemu_args-$(NET) += \
-  -device virtio-net-$(vdev-suffix),netdev=net0
+  -device e1000e,netdev=net0
+  # -device virtio-net-$(vdev-suffix),netdev=net0
 
 ifeq ($(NET_DEV), user)
   qemu_args-$(NET) += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555

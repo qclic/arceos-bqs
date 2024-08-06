@@ -2,7 +2,10 @@
 name = "axdriver"
 version.workspace = true
 edition = "2021"
-authors = ["Yuekai Jia <equation618@gmail.com>", "ChengXiang Qi <kuangjux@outlook.com>"]
+authors = [
+    "Yuekai Jia <equation618@gmail.com>",
+    "ChengXiang Qi <kuangjux@outlook.com>",
+]
 description = "ArceOS device drivers"
 license.workspace = true
 homepage.workspace = true
@@ -12,7 +15,7 @@ documentation = "https://arceos-org.github.io/arceos/axdriver/index.html"
 [features]
 dyn = []
 bus-mmio = []
-bus-pci = ["dep:axdriver_pci", "dep:axhal", "dep:axconfig"]
+bus-pci = ["dep:axdriver_pci", "dep:axhal", "dep:axconfig", "axhal/irq"]
 net = ["axdriver_net"]
 block = ["axdriver_block"]
 display = ["axdriver_display"]
@@ -27,6 +30,7 @@ virtio-gpu = ["display", "virtio", "axdriver_virtio/gpu"]
 ramdisk = ["block", "axdriver_block/ramdisk"]
 bcm2835-sdhci = ["block", "axdriver_block/bcm2835-sdhci"]
 ixgbe = ["net", "axdriver_net/ixgbe", "dep:axalloc", "dep:axhal"]
+e1000 = ["net", "e1000-driver", "bus-pci"]
 # more devices example: e1000 = ["net", "axdriver_net/e1000"]
 
 default = ["bus-pci"]
@@ -43,3 +47,6 @@ axdriver_virtio = { git = "https://github.com/arceos-org/axdriver_crates.git", t
 axalloc = { workspace = true, optional = true }
 axhal = { workspace = true, optional = true }
 axconfig = { workspace = true, optional = true }
+kspin = "0"
+pcie = { path = "../../../pcie" }
+e1000-driver = { git = "https://gitee.com/zr233/e1000-rust.git", bratch = "dev-v3-6.6", tag="v0.2.3" , optional = true }
