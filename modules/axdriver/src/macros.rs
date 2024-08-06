@@ -63,6 +63,11 @@ macro_rules! for_each_drivers {
         {
             type $drv_type = crate::drivers::IxgbeDriver;
             $code
+        }        
+        #[cfg(net_dev = "e1000")]
+        {
+            type $drv_type = crate::drivers::E1000Driver;
+            $code
         }
     }};
 }

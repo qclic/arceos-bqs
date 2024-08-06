@@ -61,6 +61,7 @@ bus-mmio = ["axfeat/bus-mmio"]
 bus-pci = ["axfeat/bus-pci"]
 driver-ramdisk = ["axfeat/driver-ramdisk"]
 driver-ixgbe = ["axfeat/driver-ixgbe"]
+driver-e1000 = ["axfeat/driver-e1000"]
 driver-bcm2835-sdhci = ["axfeat/driver-bcm2835-sdhci"]
 
 # Logging
