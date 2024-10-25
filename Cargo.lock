@@ -1112,6 +1112,7 @@ dependencies = [
 [[package]]
 name = "pcie"
 version = "0.1.0"
+source = "git+https://gitee.com/zr233/pcie#6a04a2388b8d5afe819d231806f55a429fac0b0b"
 dependencies = [
  "bit_field",
  "embedded-hal",

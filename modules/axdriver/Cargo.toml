@@ -56,5 +56,5 @@ axhal = { workspace = true, optional = true }
 axconfig = { workspace = true, optional = true }
 axdma = { workspace = true, optional = true }
 kspin = { version = "0" }
-pcie = { path = "../../../pcie" }
+pcie = { git = "https://gitee.com/zr233/pcie" }
 e1000-driver = { git = "https://gitee.com/zr233/e1000-rust.git", bratch = "dev-v3-6.6", tag = "v0.2.3", optional = true }
