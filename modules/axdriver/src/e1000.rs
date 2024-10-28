@@ -196,8 +196,11 @@ impl<C: Chip> KernelFunc for KFun<C> {
         axhal::time::busy_wait(duration)
     }
 
-    fn pci_read_config_word(&self, where_: i32) -> u16 {
-        todo!()
+    fn pci_read_config_word(&self, offset: i32) -> u16 {
+        info!("pci read config offset {}", offset);
+        let dword = unsafe { self.pcie.read(self.pcie.address(), offset as _) };
+        let ptr = &dword as *const u32 as usize as *const u16;
+        unsafe { *ptr }
     }
 
     fn pci_cap_offset(&self) -> i32 {
