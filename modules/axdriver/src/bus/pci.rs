@@ -88,6 +88,8 @@ impl AllDevices {
     pub(crate) fn probe_bus_devices(&mut self) {
         let base_vaddr = phys_to_virt(axconfig::PCI_ECAM_BASE.into());
 
+        info!("Init PCIE @{:#X}", axconfig::PCI_ECAM_BASE);
+
         let mut root = pcie::RootGeneric::new(base_vaddr.as_usize());
 
         root.enumerate().for_each(|device| {
