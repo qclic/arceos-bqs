@@ -208,7 +208,7 @@ impl DriverProbe for E1000Driver {
         dev: Arc<pcie::Endpoint<C>>,
     ) -> Option<AxDeviceEnum> {
         let (vid, did) = dev.id();
-        let device_id_list = [0x10D3, 0x100E, 0x0DC8];
+        let device_id_list = [0x10D3, 0x0DC8];
 
         if vid == 0x8086 && device_id_list.contains( &did) {
             info!("E1000E PCI device found at {:?}", dev.address());
