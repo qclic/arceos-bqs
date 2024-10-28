@@ -8,7 +8,7 @@ family = "x86-pc"
 # Base address of the whole physical memory.
 phys-memory-base = "0"
 # Size of the whole physical memory.
-phys-memory-size = "0x8000_0000"    # 2G
+phys-memory-size = "0x8000_0000" # 2G
 # Base physical address of the kernel image.
 kernel-base-paddr = "0x20_0000"
 # Base virtual address of the kernel image.
@@ -28,7 +28,8 @@ mmio-regions = [
     ["0xfec0_0000", "0x1000"],      # IO APIC
     ["0xfed0_0000", "0x1000"],      # HPET
     ["0xfee0_0000", "0x1000"],      # Local APIC
-    ["0xf000_0000", "0x0800_0000"], # PCI config space
+    # ["0xf000_0000", "0x0800_0000"], # PCI config space
+    ["0xc000_0000", "0x0100_0000"], # PCI config space
     ["0xfcd8_0000", "0x0008_0000"], # Ixgbe BAR0
 ]
 # VirtIO MMIO regions with format (`base_paddr`, `size`).
@@ -41,4 +42,4 @@ pci-bus-end = "0x7f"
 pci-ranges = []
 
 # Timer interrupt frequencyin Hz.
-timer-frequency = "4_000_000_000"   # 4.0GHz
+timer-frequency = "4_000_000_000" # 4.0GHz
