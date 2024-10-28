@@ -45,7 +45,6 @@ impl E1000E {
             uc_list_len: 6,
         };
 
-        let net_dev_settings = net_dev_settings;
         let settings = net_dev_settings;
         e1000.open(settings).unwrap();
 
