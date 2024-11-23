@@ -24,8 +24,10 @@ members = [
     "ulib/axlibc",
 
     "examples/helloworld",
+    "examples/exception",
+    "examples/memtest",
+    "examples/task/parallel",
     "examples/httpclient",
-    "examples/httpserver",
     "examples/httpserver",
     "examples/shell",
 ]
