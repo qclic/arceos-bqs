@@ -47,6 +47,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "arceos-exception"
+version = "0.1.0"
+dependencies = [
+ "axstd",
+ "linkme",
+]
+
+[[package]]
 name = "arceos-helloworld"
 version = "0.1.0"
 dependencies = [
@@ -65,6 +73,22 @@ name = "arceos-httpserver"
 version = "0.1.0"
 dependencies = [
  "axstd",
+]
+
+[[package]]
+name = "arceos-memtest"
+version = "0.1.0"
+dependencies = [
+ "axstd",
+ "rand",
+]
+
+[[package]]
+name = "arceos-parallel"
+version = "0.1.0"
+dependencies = [
+ "axstd",
+ "rand",
 ]
 
 [[package]]
