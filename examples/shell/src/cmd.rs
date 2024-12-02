@@ -27,6 +27,7 @@ const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("pwd", do_pwd),
     ("rm", do_rm),
     ("uname", do_uname),
+    ("rename", do_rename),
 ];
 
 fn file_type_to_char(ty: FileType) -> char {
@@ -258,6 +259,29 @@ fn do_uname(_args: &str) {
         arch = arch,
         plat = platform,
     );
+}
+
+fn do_rename(args: &str) {
+    let mut _rn_dir = false;
+    let mut file_names: Vec<&str> = Vec::new();
+    for arg in args.split_whitespace() {
+        if arg == "-d" {
+            _rn_dir = true;
+        } else {
+            file_names.push(arg);
+        }
+    }
+    if let Err(_) = fs::metadata(file_names[0]) {
+        print_err!("move", "value NotFound");
+        return ;
+    }
+    if file_names.len() == 2 {
+        fs::rename(file_names[0], file_names[1]).unwrap();
+    } else if file_names.len() > 2 {
+        print_err!("rename", "Too many arguments");
+    } else {
+        print_err!("rename", "Too few arguments");
+    }
 }
 
 fn do_help(_args: &str) {
