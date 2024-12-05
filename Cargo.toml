@@ -26,7 +26,7 @@ members = [
     "examples/helloworld",
     "examples/exception",
     "examples/memtest",
-    "examples/task/parallel",
+    "examples/task/yield",
     "examples/httpclient",
     "examples/httpserver",
     "examples/shell",
